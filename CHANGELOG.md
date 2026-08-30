@@ -2,6 +2,10 @@
 
 ## 0.1.1
 
+- Bound credential acquisition, authentication refresh, transport, and buffered
+  or streaming response reads by one cancellable request deadline.
+- Prevent late dispatch, release failed response bodies without waiting for
+  cleanup, and sanitize credential-provider failures.
 - Make public SDK and generated contract documentation
   infrastructure-provider neutral.
 

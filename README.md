@@ -51,6 +51,24 @@ or application logs.
 See [`COMPATIBILITY.md`](COMPATIBILITY.md) for the supported runtime contract
 and release certification matrix.
 
+## Deadlines and cancellation
+
+`timeoutMs` defaults to 30 seconds (allowed range: 1–60 seconds). One budget
+covers token acquisition, both authentication attempts, and streaming or
+buffered response reads. Token providers receive an optional `signal` alongside
+`forceRefresh`; pass it to your backend exchange to cancel that work too.
+
+Every customer API method accepts `{ signal }` request options. Use a caller
+`AbortController` when a screen unmounts or the signed-in identity changes.
+Pre-aborted calls do not invoke credentials or send a request. A late token
+cannot start a request after cancellation or timeout.
+
+Errors preserve `REQUEST_ABORTED` or `REQUEST_TIMEOUT` even if a credential
+provider or native response stalls. Cancellation does not undo a message or
+conversation the server already accepted. Reconcile history before retrying a
+write with an uncertain outcome; network failures and timeouts are not
+automatically replayed.
+
 ## Release status
 
 Version `0.1.1` is generated from the customer contract recorded in
