@@ -68,7 +68,7 @@
   "devDependencies": {
     "@react-native-community/cli": "20.2.0",
     "@react-native/metro-config": "0.86.2",
-    "@types/node": "22.20.1",
+    "@types/node": "26.4.0",
     "@types/react": "19.2.14",
     "openapi-typescript": "7.13.0",
     "prettier": "3.9.6",
