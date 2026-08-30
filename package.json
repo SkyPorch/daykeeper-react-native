@@ -1,0 +1,95 @@
+{
+  "name": "@skyporch/daykeeper-react-native",
+  "version": "0.1.0",
+  "description": "Official React Native SDK for Daykeeper customer support experiences",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "react-native": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "react-native": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "CHANGELOG.md",
+    "COMPATIBILITY.md",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm,cjs --dts --sourcemap --target es2020 --clean",
+    "check": "pnpm format:check && pnpm check:generated && pnpm typecheck && pnpm test && pnpm build && pnpm verify:exports && pnpm smoke:metro && pnpm pack:check",
+    "check:generated": "pnpm generate && git diff --exit-code -- src/generated/schema.ts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "generate": "openapi-typescript openapi/customer.yaml --output src/generated/schema.ts",
+    "pack:check": "npm pack --dry-run --json",
+    "smoke:metro": "react-native bundle --platform ios --dev false --entry-file smoke/index.js --bundle-output .smoke/ios.jsbundle && react-native bundle --platform android --dev false --entry-file smoke/index.js --bundle-output .smoke/android.jsbundle",
+    "test": "tsx --test \"test/**/*.test.ts\"",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "verify:exports": "node scripts/verify-exports.mjs",
+    "prepublishOnly": "node scripts/verify-release.mjs",
+    "prepack": "pnpm run build"
+  },
+  "packageManager": "pnpm@10.8.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "peerDependencies": {
+    "react-native": ">=0.79"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SkyPorch/daykeeper-react-native.git"
+  },
+  "bugs": {
+    "url": "https://github.com/SkyPorch/daykeeper-react-native/issues"
+  },
+  "homepage": "https://github.com/SkyPorch/daykeeper-react-native#readme",
+  "license": "MIT",
+  "dependencies": {
+    "@babel/runtime": "7.29.2"
+  },
+  "devDependencies": {
+    "@react-native-community/cli": "20.2.0",
+    "@react-native/metro-config": "0.86.2",
+    "@types/node": "22.20.1",
+    "@types/react": "19.2.14",
+    "openapi-typescript": "7.13.0",
+    "prettier": "3.9.6",
+    "react": "19.2.3",
+    "react-native": "0.86.2",
+    "tsup": "8.5.1",
+    "tsx": "4.23.12",
+    "typescript": "5.9.3"
+  },
+  "keywords": [
+    "daykeeper",
+    "customer-support",
+    "react-native",
+    "expo",
+    "ios",
+    "android",
+    "sdk"
+  ],
+  "pnpm": {
+    "overrides": {
+      "esbuild": "0.28.1"
+    }
+  }
+}

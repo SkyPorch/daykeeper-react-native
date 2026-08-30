@@ -1,0 +1,424 @@
+import {
+  DaykeeperReactNativeApiError,
+  DaykeeperReactNativeTransportError,
+} from "./errors.js";
+import type {
+  DaykeeperClaimConversationResult,
+  DaykeeperConversationList,
+  DaykeeperConversationResult,
+  DaykeeperCustomerIdentity,
+  DaykeeperMessageList,
+  DaykeeperMessageResult,
+  DaykeeperSeenResult,
+  DaykeeperUnreadSummary,
+} from "./types.js";
+
+const DEFAULT_TIMEOUT_MS = 30_000;
+const MAX_RESPONSE_BYTES = 1024 * 1024;
+const MAX_TOKEN_LENGTH = 16_384;
+const MAX_MESSAGE_LENGTH = 16_000;
+
+export interface DaykeeperReactNativeTokenProviderContext {
+  /**
+   * True only after Daykeeper rejected the first token with HTTP 401. The
+   * provider should bypass any token cache and exchange the app session again.
+   */
+  forceRefresh: boolean;
+}
+
+export type DaykeeperReactNativeTokenProvider = (
+  context: DaykeeperReactNativeTokenProviderContext,
+) => string | Promise<string>;
+
+export interface DaykeeperReactNativeClientOptions {
+  baseUrl: string;
+  getAccessToken: DaykeeperReactNativeTokenProvider;
+  fetch?: typeof globalThis.fetch;
+  timeoutMs?: number;
+}
+
+export interface DaykeeperReactNativeRequestOptions {
+  signal?: AbortSignal;
+}
+
+export class DaykeeperReactNativeClient {
+  readonly #baseUrl: string;
+  readonly #fetch: typeof globalThis.fetch;
+  readonly #getAccessToken: DaykeeperReactNativeTokenProvider;
+  readonly #timeoutMs: number;
+
+  constructor(options: DaykeeperReactNativeClientOptions) {
+    this.#baseUrl = parseBaseUrl(options.baseUrl);
+    this.#fetch = options.fetch ?? globalThis.fetch;
+    if (typeof this.#fetch !== "function") {
+      throw configurationError("A Fetch API implementation is required");
+    }
+    if (typeof options.getAccessToken !== "function") {
+      throw configurationError("getAccessToken must be a function");
+    }
+    this.#getAccessToken = options.getAccessToken;
+    this.#timeoutMs = validateTimeout(options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+  }
+
+  getIdentity(
+    options?: DaykeeperReactNativeRequestOptions,
+  ): Promise<DaykeeperCustomerIdentity> {
+    return this.#request("/v1/identity", { signal: options?.signal });
+  }
+
+  listConversations(
+    options?: DaykeeperReactNativeRequestOptions,
+  ): Promise<DaykeeperConversationList> {
+    return this.#request("/v1/conversations", { signal: options?.signal });
+  }
+
+  createConversation(
+    options?: DaykeeperReactNativeRequestOptions,
+  ): Promise<DaykeeperConversationResult> {
+    return this.#request("/v1/conversations", {
+      method: "POST",
+      signal: options?.signal,
+    });
+  }
+
+  getUnread(
+    options?: DaykeeperReactNativeRequestOptions,
+  ): Promise<DaykeeperUnreadSummary> {
+    return this.#request("/v1/unread", { signal: options?.signal });
+  }
+
+  markConversationSeen(
+    conversationId: number,
+    options?: DaykeeperReactNativeRequestOptions,
+  ): Promise<DaykeeperSeenResult> {
+    return this.#request(
+      `/v1/conversations/${positiveInteger(conversationId, "conversationId")}/seen`,
+      { method: "POST", signal: options?.signal },
+    );
+  }
+
+  listMessages(
+    conversationId: number,
+    options: DaykeeperReactNativeRequestOptions & { after?: number } = {},
+  ): Promise<DaykeeperMessageList> {
+    const id = positiveInteger(conversationId, "conversationId");
+    const after =
+      options.after === undefined
+        ? ""
+        : `?after=${positiveInteger(options.after, "after")}`;
+    return this.#request(`/v1/conversations/${id}/messages${after}`, {
+      signal: options.signal,
+    });
+  }
+
+  sendMessage(
+    conversationId: number,
+    content: string,
+    options?: DaykeeperReactNativeRequestOptions,
+  ): Promise<DaykeeperMessageResult> {
+    const normalizedContent = validateMessage(content);
+    return this.#request(
+      `/v1/conversations/${positiveInteger(conversationId, "conversationId")}/messages`,
+      {
+        method: "POST",
+        body: { content: normalizedContent },
+        signal: options?.signal,
+      },
+    );
+  }
+
+  claimAnonymousConversation(
+    widgetToken: string,
+    options?: DaykeeperReactNativeRequestOptions,
+  ): Promise<DaykeeperClaimConversationResult> {
+    if (
+      typeof widgetToken !== "string" ||
+      !widgetToken.trim() ||
+      widgetToken.length > MAX_TOKEN_LENGTH
+    ) {
+      throw configurationError("widgetToken is invalid");
+    }
+    return this.#request("/v1/anonymous-conversations/claim", {
+      method: "POST",
+      body: { widgetToken: widgetToken.trim() },
+      signal: options?.signal,
+    });
+  }
+
+  async #request<ResponseBody>(
+    path: string,
+    options: {
+      method?: "GET" | "POST";
+      body?: unknown;
+      signal?: AbortSignal;
+    } = {},
+  ): Promise<ResponseBody> {
+    const timeoutController = new AbortController();
+    let timedOut = false;
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      timeoutController.abort();
+    }, this.#timeoutMs);
+    const onCallerAbort = () => timeoutController.abort();
+    if (options.signal?.aborted) timeoutController.abort();
+    else
+      options.signal?.addEventListener("abort", onCallerAbort, { once: true });
+
+    try {
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        const token = validateToken(
+          await this.#getAccessToken({ forceRefresh: attempt === 1 }),
+        );
+        const headers = new Headers({
+          accept: "application/json",
+          authorization: `Bearer ${token}`,
+        });
+        if (options.body !== undefined) {
+          headers.set("content-type", "application/json");
+        }
+
+        let response: Response;
+        try {
+          response = await this.#fetch(`${this.#baseUrl}${path}`, {
+            method: options.method ?? "GET",
+            body:
+              options.body === undefined
+                ? undefined
+                : JSON.stringify(options.body),
+            headers,
+            signal: timeoutController.signal,
+          });
+        } catch {
+          if (timedOut) {
+            throw new DaykeeperReactNativeTransportError({
+              code: "REQUEST_TIMEOUT",
+              message: `The Daykeeper request exceeded ${this.#timeoutMs}ms`,
+              retryable: true,
+            });
+          }
+          if (options.signal?.aborted) {
+            throw new DaykeeperReactNativeTransportError({
+              code: "REQUEST_ABORTED",
+              message: "The Daykeeper request was aborted",
+            });
+          }
+          throw new DaykeeperReactNativeTransportError({
+            code: "NETWORK_ERROR",
+            message: "The Daykeeper customer API could not be reached",
+            retryable: true,
+          });
+        }
+
+        const payload = await readJson(response);
+        if (response.status === 401 && attempt === 0) continue;
+        if (!response.ok) {
+          const code =
+            isRecord(payload) && typeof payload.error === "string"
+              ? payload.error
+              : "daykeeper_request_failed";
+          throw new DaykeeperReactNativeApiError({
+            status: response.status,
+            code,
+            retryable:
+              response.status === 408 ||
+              response.status === 429 ||
+              response.status >= 500,
+          });
+        }
+        if (!isRecord(payload)) {
+          throw new DaykeeperReactNativeTransportError({
+            code: "INVALID_RESPONSE",
+            message: "The Daykeeper customer API returned an invalid response",
+            retryable: true,
+          });
+        }
+        return payload as ResponseBody;
+      }
+      throw new Error("Unreachable Daykeeper request state");
+    } finally {
+      clearTimeout(timeout);
+      options.signal?.removeEventListener("abort", onCallerAbort);
+    }
+  }
+}
+
+export function createDaykeeperReactNativeClient(
+  options: DaykeeperReactNativeClientOptions,
+): DaykeeperReactNativeClient {
+  return new DaykeeperReactNativeClient(options);
+}
+
+function parseBaseUrl(value: string): string {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw configurationError("baseUrl must be a valid absolute URL");
+  }
+  const local = ["localhost", "127.0.0.1", "::1"].includes(url.hostname);
+  if (url.protocol !== "https:" && !(local && url.protocol === "http:")) {
+    throw configurationError(
+      "baseUrl must use HTTPS except for loopback development",
+    );
+  }
+  if (url.username || url.password || url.search || url.hash) {
+    throw configurationError(
+      "baseUrl cannot include credentials, a query, or a fragment",
+    );
+  }
+  return url.toString().replace(/\/$/, "");
+}
+
+function validateTimeout(value: number): number {
+  if (!Number.isInteger(value) || value < 1_000 || value > 60_000) {
+    throw configurationError(
+      "timeoutMs must be an integer from 1000 through 60000",
+    );
+  }
+  return value;
+}
+
+function validateToken(value: string): string {
+  if (
+    typeof value !== "string" ||
+    !value ||
+    value.length > MAX_TOKEN_LENGTH ||
+    /[\r\n]/.test(value)
+  ) {
+    throw configurationError("The customer access token is invalid");
+  }
+  return value;
+}
+
+function positiveInteger(value: number, name: string): number {
+  if (!Number.isInteger(value) || value < 1) {
+    throw configurationError(`${name} must be a positive integer`);
+  }
+  return value;
+}
+
+function validateMessage(value: string): string {
+  if (typeof value !== "string") {
+    throw configurationError("Message content must be a string");
+  }
+  const normalized = value.trim();
+  if (!normalized || normalized.length > MAX_MESSAGE_LENGTH) {
+    throw configurationError(
+      `Message content must be 1 to ${MAX_MESSAGE_LENGTH} characters`,
+    );
+  }
+  return normalized;
+}
+
+async function readJson(response: Response): Promise<unknown> {
+  const declaredLength = Number(response.headers.get("content-length"));
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_RESPONSE_BYTES) {
+    throw responseTooLarge();
+  }
+
+  const body = response.body;
+  if (
+    body &&
+    typeof body.getReader === "function" &&
+    typeof TextDecoder === "function"
+  ) {
+    return parseJson(await readStream(body));
+  }
+
+  let text: string;
+  try {
+    text = await response.text();
+  } catch {
+    throw invalidResponse();
+  }
+  if (utf8LengthExceeds(text, MAX_RESPONSE_BYTES)) {
+    throw responseTooLarge();
+  }
+  return parseJson(text);
+}
+
+async function readStream(body: ReadableStream<Uint8Array>): Promise<string> {
+  const reader = body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > MAX_RESPONSE_BYTES) {
+        await reader.cancel();
+        throw responseTooLarge();
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(bytes);
+}
+
+function parseJson(text: string): unknown {
+  if (!text) return undefined;
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    throw invalidResponse();
+  }
+}
+
+function utf8LengthExceeds(value: string, maximum: number): boolean {
+  let bytes = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    const codeUnit = value.charCodeAt(index);
+    if (codeUnit < 0x80) bytes += 1;
+    else if (codeUnit < 0x800) bytes += 2;
+    else if (
+      codeUnit >= 0xd800 &&
+      codeUnit <= 0xdbff &&
+      index + 1 < value.length &&
+      value.charCodeAt(index + 1) >= 0xdc00 &&
+      value.charCodeAt(index + 1) <= 0xdfff
+    ) {
+      bytes += 4;
+      index += 1;
+    } else bytes += 3;
+    if (bytes > maximum) return true;
+  }
+  return false;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function responseTooLarge(): DaykeeperReactNativeTransportError {
+  return new DaykeeperReactNativeTransportError({
+    code: "RESPONSE_TOO_LARGE",
+    message: "The Daykeeper response exceeded 1 MiB",
+  });
+}
+
+function invalidResponse(): DaykeeperReactNativeTransportError {
+  return new DaykeeperReactNativeTransportError({
+    code: "INVALID_RESPONSE",
+    message: "The Daykeeper customer API returned invalid JSON",
+    retryable: true,
+  });
+}
+
+function configurationError(
+  message: string,
+): DaykeeperReactNativeTransportError {
+  return new DaykeeperReactNativeTransportError({
+    code: "INVALID_CONFIGURATION",
+    message,
+  });
+}
