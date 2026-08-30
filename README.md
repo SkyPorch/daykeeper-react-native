@@ -69,6 +69,11 @@ conversation the server already accepted. Reconcile history before retrying a
 write with an uncertain outcome; network failures and timeouts are not
 automatically replayed.
 
+Credential-provider failures use the non-retryable `TOKEN_PROVIDER_ERROR`
+code, distinct from network failures. Raw provider errors are not exposed.
+Handle sign-in recovery in the token provider or the application; deadline and
+caller cancellation still use their dedicated error codes.
+
 ## Release status
 
 Version `0.1.1` is generated from the customer contract recorded in

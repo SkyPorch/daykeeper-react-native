@@ -1,5 +1,6 @@
 export type DaykeeperReactNativeTransportErrorCode =
   | "INVALID_CONFIGURATION"
+  | "TOKEN_PROVIDER_ERROR"
   | "NETWORK_ERROR"
   | "REQUEST_ABORTED"
   | "REQUEST_TIMEOUT"

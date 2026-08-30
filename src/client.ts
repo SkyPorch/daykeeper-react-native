@@ -167,7 +167,7 @@ export class DaykeeperReactNativeClient {
       for (let attempt = 0; attempt < 2; attempt += 1) {
         const token = validateToken(
           await lifetime.run(() =>
-            this.#getAccessToken({
+            resolveToken(this.#getAccessToken, {
               forceRefresh: attempt === 1,
               signal: lifetime.signal,
             }),
@@ -181,19 +181,24 @@ export class DaykeeperReactNativeClient {
           headers.set("content-type", "application/json");
         }
 
-        response = await lifetime.run(
-          () =>
-            this.#fetch(`${this.#baseUrl}${path}`, {
-              method: options.method ?? "GET",
-              body:
-                options.body === undefined
-                  ? undefined
-                  : JSON.stringify(options.body),
-              headers,
-              signal: lifetime.signal,
-            }),
-          discardResponse,
-        );
+        try {
+          response = await lifetime.run(
+            () =>
+              this.#fetch(`${this.#baseUrl}${path}`, {
+                method: options.method ?? "GET",
+                body:
+                  options.body === undefined
+                    ? undefined
+                    : JSON.stringify(options.body),
+                headers,
+                signal: lifetime.signal,
+              }),
+            discardResponse,
+          );
+        } catch (error) {
+          if (error instanceof DaykeeperReactNativeTransportError) throw error;
+          throw networkError();
+        }
 
         if (response.status === 401 && attempt === 0) {
           discardResponse(response);
@@ -224,17 +229,6 @@ export class DaykeeperReactNativeClient {
         return payload as ResponseBody;
       }
       throw new Error("Unreachable Daykeeper request state");
-    } catch (error) {
-      if (
-        error instanceof DaykeeperReactNativeApiError ||
-        error instanceof DaykeeperReactNativeTransportError
-      )
-        throw error;
-      throw new DaykeeperReactNativeTransportError({
-        code: "NETWORK_ERROR",
-        message: "The Daykeeper customer API could not be reached",
-        retryable: true,
-      });
     } finally {
       if (response) discardResponse(response);
       lifetime.dispose();
@@ -246,6 +240,28 @@ export function createDaykeeperReactNativeClient(
   options: DaykeeperReactNativeClientOptions,
 ): DaykeeperReactNativeClient {
   return new DaykeeperReactNativeClient(options);
+}
+
+async function resolveToken(
+  provider: DaykeeperReactNativeTokenProvider,
+  context: DaykeeperReactNativeTokenProviderContext,
+): Promise<string> {
+  try {
+    return await provider(context);
+  } catch {
+    throw new DaykeeperReactNativeTransportError({
+      code: "TOKEN_PROVIDER_ERROR",
+      message: "The Daykeeper access token could not be obtained",
+    });
+  }
+}
+
+function networkError(): DaykeeperReactNativeTransportError {
+  return new DaykeeperReactNativeTransportError({
+    code: "NETWORK_ERROR",
+    message: "The Daykeeper customer API transport failed",
+    retryable: true,
+  });
 }
 
 function parseBaseUrl(value: string): string {
@@ -358,6 +374,9 @@ async function readStream(
       }
       chunks.push(value);
     }
+  } catch (error) {
+    if (error instanceof DaykeeperReactNativeTransportError) throw error;
+    throw networkError();
   } finally {
     discardReader(reader);
   }

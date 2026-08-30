@@ -2,6 +2,8 @@
 
 ## 0.1.1
 
+- Classify credential-provider failures as non-retryable `TOKEN_PROVIDER_ERROR`
+  without exposing raw provider errors; timeout and cancellation stay distinct.
 - Bound credential acquisition, authentication refresh, transport, and buffered
   or streaming response reads by one cancellable request deadline.
 - Prevent late dispatch, release failed response bodies without waiting for
