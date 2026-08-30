@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1
+
+- Make public SDK and generated contract documentation
+  infrastructure-provider neutral.
+
 ## 0.1.0
 
 - Add typed customer identity, conversation, message, unread, and seen APIs.
