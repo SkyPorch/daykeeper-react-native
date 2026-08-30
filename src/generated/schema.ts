@@ -192,7 +192,7 @@ export interface components {
             status: "open" | "pending" | "resolved" | "snoozed";
             createdAt: number | string | null;
             updatedAt: number | string | null;
-            /** @description Chatwoot agent-side unread count; do not use for a customer badge. */
+            /** @description Agent-side unread count reported by the conversation provider; do not use for a customer badge. */
             unreadCount: number;
             /** @description Customer-side unread count used for product badges. */
             unreadForContact: number;
