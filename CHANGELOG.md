@@ -1,6 +1,19 @@
 # Changelog
 
-## 0.1.1
+## 0.2.0 (unreleased)
+
+- Breaking native setup change: configure a Fetch transport explicitly. The
+  native export no longer silently falls back to React Native's XHR-based Fetch.
+  On the validated Expo 57 runtime, import `fetch` from `expo/fetch` and supply
+  it as the client `fetch` option. Bare native transports must enforce the same
+  redirect rejection and cookie omission contract; Expo is not a dependency.
+- Set `redirect: "error"` and `credentials: "omit"` on every SDK request,
+  including credential refresh. Node/web standard Fetch remains the default.
+- Verify native and Node ESM/CJS exports, declarations and installed-package
+  policy behavior independently. Android/release certification remains open.
+
+The following changes were developed in the unpublished `0.1.1` candidate and
+are included here; `0.1.0` remains the published baseline until release approval.
 
 - Never replay writes after authentication failure; classify uncertain write
   outcomes explicitly and make all write errors non-retryable.

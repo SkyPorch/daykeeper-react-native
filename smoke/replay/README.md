@@ -2,8 +2,8 @@
 
 `pnpm build && pnpm smoke:package` packs the SDK, installs it with its existing
 runtime dependency in a cold-cache offline consumer, checks ESM/CJS declarations
-and the native export condition, and runs the same 60 scenarios through both
-installed exports using real loopback HTTP. No registry credentials, production
+and the native export condition, and runs the same 60 scenarios through all four
+Node/native ESM/CJS exports using real loopback HTTP. No registry credentials, production
 services, or mocked fetch are involved. Results include the tarball checksum in
 `.smoke/latest-package.json`.
 
@@ -12,7 +12,10 @@ development client, mount `native.js` as the entry point and configure Metro to
 resolve `@skyporch/daykeeper-react-native` to the **installed tarball** recorded
 by the package smoke, not `src/` or the checkout's `dist/`. Share the host's one
 React/React Native instance. Use the host's existing Babel/native setup; this
-fixture does not add a native module or change the app's dependencies.
+fixture does not add a native module or change the app's dependencies. The native
+fixture uses the host's existing Expo 57 `expo/fetch` explicitly; it does not
+silently select the XHR-backed global. Custom transports must meet the SDK's
+strict redirect and cookie contract.
 
 Start `node smoke/replay/server.mjs 18244`, then press the fixture's run button.
 The fixture sends only synthetic credentials, messages and test results to

@@ -41,6 +41,7 @@ export type DaykeeperReactNativeTokenProvider = (
 export interface DaykeeperReactNativeClientOptions {
   baseUrl: string;
   getAccessToken: DaykeeperReactNativeTokenProvider;
+  /** Must reject redirects before following and omit ambient cookies. */
   fetch?: typeof globalThis.fetch;
   timeoutMs?: number;
 }
@@ -197,6 +198,8 @@ export class DaykeeperReactNativeClient {
                   : JSON.stringify(options.body),
               headers,
               signal: lifetime.signal,
+              redirect: "error",
+              credentials: "omit",
             });
           }, discardResponse);
         } catch (error) {
