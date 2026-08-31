@@ -2,6 +2,8 @@
 
 ## 0.1.1
 
+- Respect explicit server retry advice for customer API errors, including
+  non-retryable quota ceilings; preserve older status-only responses.
 - Align vendored OpenAPI license metadata and record the exact source commit
   and checksum; generated types and runtime behavior are unchanged.
 - Classify credential-provider failures as non-retryable `TOKEN_PROVIDER_ERROR`
