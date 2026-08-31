@@ -57,6 +57,14 @@ same matrix with 62 dispatches and 62 wire requests each; 93 unit tests and
 iOS/Android Metro builds passed. The downstream candidate regression suite
 passed 2,251 tests, with an explicit expected write-retry contract change.
 
+The final Node 20 CI fix enumerates test files instead of relying on newer
+Node glob expansion. Its tarball SHA-256 is
+`6982ecae9e963b362a4f02acb7a8506eb996906e507d9333f94400e7d4703350`.
+All six runtime/declaration/map files are byte-identical to the native-tested
+artifact above; only test-script package metadata changed. The final artifact
+also passed the complete 2,251-test downstream matrix. Keep the artifact hashes
+distinct rather than attributing the native run to a later tarball.
+
 The first native launch exited in the development host's push-module
 initialization before reaching the fixture. A cold start succeeded. This is
 retained as a native-host stability follow-up, not suppressed or counted as a
