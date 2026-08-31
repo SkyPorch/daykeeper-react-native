@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { AppRegistry, Platform, Pressable, Text, View } from "react-native";
 import * as sdk from "@skyporch/daykeeper-react-native";
 import { runReplayCases } from "./cases.js";
+import { fetch as expoFetch } from "expo/fetch";
 
 if (!__DEV__) throw new Error("Synthetic fixture requires development mode");
 const origin = "http://127.0.0.1:18244";
@@ -21,8 +22,9 @@ function Fixture() {
         `native-${Platform.OS}`,
         (count) => setState(`Checked ${count} cases`),
         Platform.OS,
+        expoFetch,
       );
-      const response = await fetch(`${origin}/__fixture/result`, {
+      const response = await expoFetch(`${origin}/__fixture/result`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -33,6 +35,7 @@ function Fixture() {
             react: React.version,
             reactNative: Platform.constants.reactNativeVersion,
             hermes: typeof globalThis.HermesInternal !== "undefined",
+            transport: "expo/fetch",
           },
         }),
       });
@@ -42,7 +45,7 @@ function Fixture() {
       );
     } catch (error) {
       setState(`Failed: ${error.message}`);
-      await fetch(`${origin}/__fixture/result`, {
+      await expoFetch(`${origin}/__fixture/result`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({

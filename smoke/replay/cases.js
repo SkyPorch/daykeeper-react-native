@@ -7,6 +7,7 @@ export async function runReplayCases(
   run,
   progress = () => {},
   runtime = "node",
+  transport = globalThis.fetch,
 ) {
   if (!/^http:\/\/127\.0\.0\.1:\d+$/.test(origin) || !/^[a-z0-9-]+$/.test(run))
     throw new Error("Synthetic loopback fixture configuration required");
@@ -49,7 +50,7 @@ export async function runReplayCases(
         },
         fetch: (input, init) => {
           sdkCalls++;
-          return globalThis.fetch(input, init);
+          return transport(input, init);
         },
       });
       // Attach rejection handling immediately while waiting for cancellation.
@@ -61,7 +62,7 @@ export async function runReplayCases(
         const deadline = Date.now() + 3000;
         while (Date.now() < deadline) {
           const count = await (
-            await fetch(`${origin}/__fixture/count/${id}`)
+            await transport(`${origin}/__fixture/count/${id}`)
           ).json();
           if (count.calls > 0) break;
           await new Promise((resolve) => setTimeout(resolve, 25));
@@ -113,7 +114,7 @@ export async function runReplayCases(
         );
       }
       const count = await (
-        await fetch(`${origin}/__fixture/count/${id}`)
+        await transport(`${origin}/__fixture/count/${id}`)
       ).json();
       check(
         sdkCalls === (refreshed ? 2 : 1),

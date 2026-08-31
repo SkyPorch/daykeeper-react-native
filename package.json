@@ -1,18 +1,20 @@
 {
   "name": "@skyporch/daykeeper-react-native",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Official React Native SDK for Daykeeper customer support experiences",
   "type": "module",
   "sideEffects": false,
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
-  "react-native": "./dist/index.js",
+  "react-native": "./dist/native.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "react-native": {
-        "types": "./dist/index.d.ts",
-        "default": "./dist/index.js"
+        "types": "./dist/native.d.ts",
+        "import": "./dist/native.js",
+        "require": "./dist/native.cjs",
+        "default": "./dist/native.js"
       },
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
@@ -28,7 +30,7 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsup src/index.ts --format esm,cjs --dts --sourcemap --target es2020 --clean",
+    "build": "tsup src/index.ts src/native.ts --format esm,cjs --dts --sourcemap --target es2020 --clean",
     "check": "pnpm format:check && pnpm check:generated && pnpm typecheck && pnpm test && pnpm build && pnpm verify:exports && pnpm smoke:package && pnpm smoke:metro && pnpm pack:check",
     "check:generated": "pnpm generate && git diff --exit-code -- src/generated/schema.ts",
     "format": "prettier --write .",

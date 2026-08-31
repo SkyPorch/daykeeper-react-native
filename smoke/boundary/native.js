@@ -20,6 +20,25 @@ function Fixture() {
     setStarted(true);
     const reports = [];
     try {
+      let omittedTokenCalls = 0;
+      let defaultRejected = false;
+      try {
+        sdk.createDaykeeperReactNativeClient({
+          baseUrl: origin,
+          getAccessToken: () => {
+            omittedTokenCalls++;
+            return "synthetic-customer-token";
+          },
+        });
+      } catch (error) {
+        defaultRejected =
+          error instanceof sdk.DaykeeperReactNativeTransportError &&
+          error.code === "INVALID_CONFIGURATION";
+      }
+      if (!defaultRejected || omittedTokenCalls !== 0)
+        throw new Error(
+          "Native implicit transport must fail before credentials",
+        );
       for (const [name, transport, strict] of [
         ["ambient", ambientFetch, false],
         ["xhr", xhrFetch, false],
@@ -49,6 +68,8 @@ function Fixture() {
         ),
       );
       const result = {
+        defaultRejected,
+        omittedTokenCalls,
         runtime: {
           platform: Platform.OS,
           version: Platform.Version,

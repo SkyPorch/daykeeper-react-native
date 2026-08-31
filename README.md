@@ -10,25 +10,30 @@ Push notifications, attachments, deep links, and native UI can be added here
 without coupling consuming applications to Daykeeper's private platform or to
 any infrastructure provider.
 
-Production certification is still open. The current default transport does not
-enforce redirect rejection or cookie isolation. Native networking may follow a
-redirect even when a Fetch option asks it not to. See the measured boundary and
-required follow-up in [`COMPATIBILITY.md`](COMPATIBILITY.md); a successful Metro
-build or Node test does not close this release gate.
+This README describes the unreleased `0.2.0` candidate. Production certification
+is still open; a successful Metro build or Node test does not establish native
+parity. See [`COMPATIBILITY.md`](COMPATIBILITY.md) before a release or upgrade.
 
 ## Install
 
+After the candidate is approved and published:
+
 ```sh
-npm install @skyporch/daykeeper-react-native
+npm install @skyporch/daykeeper-react-native@0.2.0
 ```
+
+Before publication, test with the reviewed packed tarball. An unversioned npm
+install may select the older published SDK, which does not enforce this policy.
 
 ## Use
 
 ```ts
 import { createDaykeeperReactNativeClient } from "@skyporch/daykeeper-react-native";
+import { fetch as expoFetch } from "expo/fetch";
 
 const daykeeper = createDaykeeperReactNativeClient({
   baseUrl: "https://support.example.com/support-api",
+  fetch: expoFetch,
   getAccessToken: async ({ forceRefresh }) => {
     // Exchange the signed-in app session for a short-lived, customer-scoped
     // Daykeeper token using your own backend. Bypass any local token cache when
@@ -39,6 +44,19 @@ const daykeeper = createDaykeeperReactNativeClient({
 
 const { conversations } = await daykeeper.listConversations();
 ```
+
+The native export requires an explicit Fetch implementation. This example uses
+the host's existing Expo 57 installation; the SDK does not install Expo. Bare
+React Native applications may supply their own native Fetch implementation,
+but it must reject redirects before following them, omit ambient cookies,
+and support cancellation. The XHR-backed React Native global is not compliant;
+wrapping it or setting Fetch flags does not repair its redirect behavior. Do not
+pass it as the native transport. Omitting `fetch` fails before token acquisition.
+
+Every request sets `redirect: "error"` and `credentials: "omit"`. A custom Fetch
+function is a caller-owned trust boundary: the SDK cannot prevent an injected
+implementation from ignoring those options. Use an exact HTTPS gateway URL,
+not one that redirects. Node/web exports can use standard global Fetch.
 
 The token provider runs for every request so the consuming app can rotate
 short-lived credentials. For a GET returning HTTP 401 without an explicit
@@ -119,6 +137,6 @@ The headless SDK does not own the app's login state or persistent storage.
 
 ## Release status
 
-Version `0.1.1` is generated from the customer contract recorded in
+Candidate `0.2.0` is generated from the customer contract recorded in
 [`openapi/SOURCE.md`](openapi/SOURCE.md). Releases use the protected,
 provenance-producing process in [`RELEASING.md`](RELEASING.md).

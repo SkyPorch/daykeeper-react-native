@@ -66,7 +66,7 @@ assert.equal(artifact.name, "@skyporch/daykeeper-react-native");
 assert.equal(artifact.version, manifest.version);
 for (const file of artifact.files) {
   assert(
-    /^(dist\/index\.(js|cjs|d\.ts|d\.cts)(\.map)?|package\.json|LICENSE|README\.md|CHANGELOG\.md|COMPATIBILITY\.md)$/.test(
+    /^(dist\/(index|native|chunk-[A-Z0-9]+)\.(js|cjs|d\.ts|d\.cts)(\.map)?|package\.json|LICENSE|README\.md|CHANGELOG\.md|COMPATIBILITY\.md)$/.test(
       file.path,
     ),
     `Unexpected packed file: ${file.path}`,
@@ -109,7 +109,7 @@ assert.deepEqual(installed, manifest);
 const moduleSource = 'export * from "@skyporch/daykeeper-react-native";';
 await writeFile(join(consumer, "entry.mjs"), moduleSource);
 const typeSource = `import { DaykeeperReactNativeClient, DaykeeperReactNativeApiError, DaykeeperReactNativeTransportError } from "@skyporch/daykeeper-react-native";
-const client = new DaykeeperReactNativeClient({ baseUrl: "https://support.example.test", getAccessToken: ({ signal, forceRefresh }) => "token" });
+const client = new DaykeeperReactNativeClient({ baseUrl: "https://support.example.test", getAccessToken: ({ signal, forceRefresh }) => "token", fetch: globalThis.fetch });
 client.sendMessage(1, "Synthetic");
 for (const error of [new DaykeeperReactNativeApiError({ status: 503 }), new DaykeeperReactNativeTransportError({ code: "NETWORK_ERROR", message: "Safe", outcomeUnknown: true })]) {
   const unknown: boolean = error.outcomeUnknown;
@@ -137,6 +137,27 @@ await run(
   ],
   consumer,
 );
+await run(
+  join(root, "node_modules/.bin/tsc"),
+  [
+    "--noEmit",
+    "--strict",
+    "--skipLibCheck",
+    "--module",
+    "NodeNext",
+    "--moduleResolution",
+    "NodeNext",
+    "--target",
+    "ES2022",
+    "--lib",
+    "ES2022,DOM,DOM.Iterable",
+    "--customConditions",
+    "react-native",
+    "types.mts",
+    "types.cts",
+  ],
+  consumer,
+);
 const esm = await import(pathToFileURL(join(consumer, "entry.mjs")));
 const cjs = createRequire(join(consumer, "package.json"))(manifest.name);
 const nativeExport = await run(
@@ -145,22 +166,43 @@ const nativeExport = await run(
     "--conditions=react-native",
     "--input-type=module",
     "-e",
-    `import * as sdk from '${manifest.name}'; console.log(import.meta.resolve('${manifest.name}')); if (typeof sdk.createDaykeeperReactNativeClient !== 'function') process.exit(1);`,
+    `import assert from 'node:assert/strict'; import * as sdk from '${manifest.name}'; console.log(import.meta.resolve('${manifest.name}')); assert.throws(() => sdk.createDaykeeperReactNativeClient({baseUrl:'https://support.example.test',getAccessToken:()=>{throw new Error('Credentials must not run')}}), error => error instanceof sdk.DaykeeperReactNativeTransportError && error.code === 'INVALID_CONFIGURATION');`,
   ],
   consumer,
 );
 assert(
   nativeExport
     .trim()
-    .endsWith("/node_modules/@skyporch/daykeeper-react-native/dist/index.js"),
+    .endsWith("/node_modules/@skyporch/daykeeper-react-native/dist/native.js"),
 );
+const nativeRequire = await run(
+  process.execPath,
+  [
+    "--conditions=react-native",
+    "-e",
+    `const assert=require('node:assert/strict'); const sdk=require('${manifest.name}'); console.log(require.resolve('${manifest.name}')); assert.throws(() => new sdk.DaykeeperReactNativeClient({baseUrl:'https://support.example.test',getAccessToken:()=>{throw new Error('Credentials must not run')}}), error => error instanceof sdk.DaykeeperReactNativeTransportError && error.code === 'INVALID_CONFIGURATION');`,
+  ],
+  consumer,
+);
+assert(nativeRequire.trim().endsWith("/dist/native.cjs"));
+const nativeEsm = await import(
+  pathToFileURL(
+    join(installedRoot, installed.exports["."]["react-native"].import),
+  )
+);
+const nativeCjs = createRequire(join(consumer, "package.json"))(
+  join(installedRoot, installed.exports["."]["react-native"].require),
+);
+const implementations = [
+  ["esm", esm],
+  ["cjs", cjs],
+  ["native-esm", nativeEsm],
+  ["native-cjs", nativeCjs],
+];
 const fixture = await startFixture();
 const runs = [];
 try {
-  for (const [name, sdk] of [
-    ["esm", esm],
-    ["cjs", cjs],
-  ])
+  for (const [name, sdk] of implementations)
     runs.push(await runReplayCases(sdk, fixture.origin, name));
 } finally {
   await fixture.close();
@@ -172,6 +214,24 @@ try {
     ["esm", esm],
     ["cjs", cjs],
   ]) {
+    const id = `${name}-implicit-node`;
+    const client = new sdk.DaykeeperReactNativeClient({
+      baseUrl: `${boundaryFixture.origin}/case/${id}/307/cross`,
+      getAccessToken: () => "synthetic-customer-token",
+    });
+    await assert.rejects(
+      client.getUnread(),
+      (error) =>
+        error instanceof sdk.DaykeeperReactNativeTransportError &&
+        error.code === "NETWORK_ERROR",
+    );
+    const record = await (
+      await fetch(`${boundaryFixture.origin}/record/${id}`)
+    ).json();
+    assert.equal(record.source.length, 1);
+    assert.equal(record.sink.length, 0);
+  }
+  for (const [name, sdk] of implementations) {
     for (const strict of [false, true]) {
       const report = await runBoundaryCases(
         sdk,
@@ -182,10 +242,11 @@ try {
       );
       assert.equal(report.summary.cases, 56);
       assert.equal(report.summary.redirects, 50);
-      assert.equal(report.summary.followed, strict ? 0 : 50);
-      assert.equal(report.summary.forwardedAuthorization, strict ? 0 : 25);
-      assert.equal(report.summary.forwardedBodies, strict ? 0 : 8);
-      assert.equal(report.summary.rejected, strict ? 50 : 0);
+      // SDK policy is enforced even when no extra caller wrapper is supplied.
+      assert.equal(report.summary.followed, 0);
+      assert.equal(report.summary.forwardedAuthorization, 0);
+      assert.equal(report.summary.forwardedBodies, 0);
+      assert.equal(report.summary.rejected, 50);
       // Node has no ambient cookie jar; this is not native cookie certification.
       assert.equal(report.cookie.controlPresent, false);
       assert.equal(report.cookie.sourceReceived, false);
