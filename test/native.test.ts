@@ -57,6 +57,8 @@ test("every native operation dispatches with strict redirect and cookie policy",
   for (const request of requests) {
     assert.equal(request.redirect, "error");
     assert.equal(request.credentials, "omit");
+    assert.equal(request.cache, "no-store");
+    assert.equal(request.headers.get("cache-control"), "no-cache, no-store");
     assert.equal(
       request.headers.get("authorization"),
       "Bearer synthetic-customer-token",
@@ -93,5 +95,7 @@ test("native read credential refresh keeps the strict transport policy", async (
   for (const request of requests) {
     assert.equal(request.redirect, "error");
     assert.equal(request.credentials, "omit");
+    assert.equal(request.cache, "no-store");
+    assert.equal(request.headers.get("cache-control"), "no-cache, no-store");
   }
 });

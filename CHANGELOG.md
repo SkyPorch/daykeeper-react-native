@@ -2,6 +2,12 @@
 
 ## 0.2.0 (unreleased)
 
+- Set `cache: "no-store"` on every dispatch. Native exports also send
+  `Cache-Control: no-cache, no-store` for transports that ignore Fetch cache mode.
+  Keep browser cache headers under standard Fetch control to avoid changing CORS.
+- Add seeded-cache account-switch, revoked-credential, freshness and no-new-storage
+  probes against real HTTP, with mandatory native positive cache controls.
+
 - Breaking native setup change: configure a Fetch transport explicitly. The
   native export no longer silently falls back to React Native's XHR-based Fetch.
   On the validated Expo 57 runtime, import `fetch` from `expo/fetch` and supply

@@ -10,7 +10,9 @@ web-compatible globals `Headers`, `URL`, and `AbortController`. It handles both 
 streaming responses and React Native's buffered `Response.text()` response. A
 custom `fetch` implementation must preserve those request and response
 semantics and enforce `redirect: "error"` plus `credentials: "omit"` before
-forwarding anything. Native entry types require `fetch`; runtime validation
+forwarding anything. It must also honor `Cache-Control: no-cache, no-store`;
+the native export adds this because Expo 57 ignores Fetch's `cache` option.
+All exports set `cache: "no-store"`. Native entry types require `fetch`; runtime validation
 rejects an omitted transport before credentials are requested. Standard
 Node/web Fetch remains the non-native default. Expo is not an SDK dependency.
 

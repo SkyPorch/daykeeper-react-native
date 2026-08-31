@@ -15,6 +15,8 @@ import { runReplayCases } from "../smoke/replay/cases.js";
 import { startFixture } from "../smoke/replay/server.mjs";
 import { runBoundaryCases } from "../smoke/boundary/cases.js";
 import { startBoundaryFixture } from "../smoke/boundary/server.mjs";
+import { runCacheCases } from "../smoke/cache/cases.js";
+import { startCacheFixture } from "../smoke/cache/server.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 await mkdir(join(root, ".smoke"), { recursive: true });
@@ -199,6 +201,24 @@ const implementations = [
   ["native-esm", nativeEsm],
   ["native-cjs", nativeCjs],
 ];
+const cacheFixture = await startCacheFixture();
+const caches = [];
+try {
+  for (const [name, sdk] of implementations) {
+    caches.push(
+      await runCacheCases({
+        createClient: (options) =>
+          new sdk.DaykeeperReactNativeClient({ ...options, fetch }),
+        transport: fetch,
+        origin: cacheFixture.origin,
+        run: name,
+        nativeHeaders: name.startsWith("native-"),
+      }),
+    );
+  }
+} finally {
+  await cacheFixture.close();
+}
 const fixture = await startFixture();
 const runs = [];
 try {
@@ -274,6 +294,7 @@ const result = {
   ],
   runs,
   boundaries,
+  caches,
 };
 await writeFile(
   join(directory, "result.json"),
@@ -287,6 +308,7 @@ console.log(
   JSON.stringify(
     {
       ...result,
+      caches: caches.map(({ run, summary }) => ({ run, summary })),
       runs: runs.map(({ run, cases, calls }) => ({ run, cases, calls })),
       boundaries: boundaries.map(({ run, strict, summary, cookie }) => ({
         run,
