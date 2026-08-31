@@ -262,11 +262,13 @@ test("authentication refresh shares the original deadline and abort signal", asy
   assert.equal(fetchCalls, 1);
 });
 
-test("a 401 body cannot block the one permitted authentication refresh", async () => {
+test("a stalled 401 body times out without authorizing refresh", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
   let discarded = false;
   let fetchCalls = 0;
   const refresh: boolean[] = [];
   const request = makeRequest({
+    timeoutMs: 1000,
     token: (context) => {
       refresh.push(context?.forceRefresh ?? false);
       return "token";
@@ -287,10 +289,13 @@ test("a 401 body cannot block the one permitted authentication refresh", async (
       return success();
     },
   });
-  await request();
+  const rejected = rejectsCode(request(), "REQUEST_TIMEOUT");
+  await nextTurn();
+  t.mock.timers.tick(1000);
+  await rejected;
   assert.equal(discarded, true);
-  assert.deepEqual(refresh, [false, true]);
-  assert.equal(fetchCalls, 2);
+  assert.deepEqual(refresh, [false]);
+  assert.equal(fetchCalls, 1);
 });
 
 test("oversized bodies fail without waiting for cancellation", async () => {

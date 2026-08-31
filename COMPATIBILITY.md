@@ -11,6 +11,12 @@ streaming responses and React Native's buffered `Response.text()` response. A
 custom `fetch` implementation must preserve those request and response
 semantics.
 
+Writes never automatically replay, including after 401. Read credential refresh
+honors explicit non-retryable advice before a second dispatch. An uncertain
+write result is marked `outcomeUnknown: true` and `retryable: false`; reconcile
+server state before a deliberate retry. This is not server-side idempotency.
+See the recovery contract in the README.
+
 Version 0.1 is headless and ships no native module. It does not yet provide a
 messenger UI, push-notification registration, attachment selection/upload,
 deep-link routing, persistent offline queues, or background delivery. Consumers

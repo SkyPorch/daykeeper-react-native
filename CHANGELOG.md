@@ -2,8 +2,14 @@
 
 ## 0.1.1
 
+- Never replay writes after authentication failure; classify uncertain write
+  outcomes explicitly and make all write errors non-retryable.
+- Honor first-read HTTP 401 `retryable: false` before credential refresh, within
+  the original deadline and response size limit.
+- Allowlist safe API error codes; redact unknown codes from messages, stacks,
+  and serialization. Treat failed native body reads as transport failures.
 - Respect explicit server retry advice for customer API errors, including
-  non-retryable quota ceilings; preserve older status-only responses.
+  non-retryable quota ceilings; preserve older status-only read classification.
 - Align vendored OpenAPI license metadata and record the exact source commit
   and checksum; generated types and runtime behavior are unchanged.
 - Classify credential-provider failures as non-retryable `TOKEN_PROVIDER_ERROR`

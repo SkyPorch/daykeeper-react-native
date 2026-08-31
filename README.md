@@ -1,7 +1,7 @@
 # `@skyporch/daykeeper-react-native`
 
 The official headless React Native client for customer-facing Daykeeper support
-experiences. It is generated from the Daykeeper customer API contract and is
+experiences. Its types come from the Daykeeper customer API contract; its transport is
 designed for Expo and bare React Native applications on iOS and Android.
 
 This package contains no native module and no embedded support UI. It provides
@@ -35,8 +35,9 @@ const { conversations } = await daykeeper.listConversations();
 ```
 
 The token provider runs for every request so the consuming app can rotate
-short-lived credentials. If the gateway returns HTTP 401, the SDK asks the
-provider for one forced refresh and retries exactly once. Keep customer tokens
+short-lived credentials. For a GET returning HTTP 401 without an explicit
+`retryable: false`, the SDK asks the provider for one forced refresh and retries
+the read once. Writes never refresh and replay automatically. Keep customer tokens
 in memory where possible. Never place them in URLs, analytics, crash reports,
 or application logs.
 
@@ -74,13 +75,41 @@ code, distinct from network failures. Raw provider errors are not exposed.
 Handle sign-in recovery in the token provider or the application; deadline and
 caller cancellation still use their dedicated error codes.
 
-`DaykeeperReactNativeApiError.retryable` respects an explicit boolean from the
-server. A usage ceiling can return HTTP 429 with `retryable: false`; surface its
-stable `code` and let a workspace administrator review usage instead of replaying
-the write. Older responses without the hint keep status-based classification.
-No response body message or diagnostic is copied into SDK errors, and the SDK
-does not automatically retry these failures. Only the existing one-time 401
-credential refresh is automatic.
+## Safe recovery
+
+All four writes (`createConversation`, `sendMessage`, `markConversationSeen`, and
+`claimAnonymousConversation`) dispatch at most once per call, including after
+HTTP 401. Their errors always have `retryable: false`, even when a server hint
+says otherwise. Refresh credentials in your app before a deliberate new write;
+do not wrap writes in a generic retry loop.
+
+Both exported error classes include `outcomeUnknown` in their properties and
+`toJSON()` output. It is true when a write may have reached the server but the
+SDK cannot confirm its result: a timeout, cancellation, transport/body failure
+after dispatch, or HTTP 408/5xx. Preserve the draft and read conversation history
+before offering another send. Cancellation cannot roll back an accepted write.
+`outcomeUnknown: false` is not an exactly-once guarantee or proof of no side
+effects. The customer API has no SDK-supported idempotency-key contract yet.
+The SDK's dispatch bound is not a wire-level guarantee: a native HTTP stack may
+retry internally (observed for a dropped GET on iOS). Never treat this SDK as
+an exactly-once delivery mechanism.
+
+For reads, `DaykeeperReactNativeApiError.retryable` respects an explicit server
+boolean; older responses fall back to status-based classification (408, 429,
+and 5xx). No automatic backoff or rate-limit retry is performed. Only a first
+read 401 without an explicit false hint permits one credential refresh. A
+stalled, oversized, cancelled, or failed 401 body does not permit that refresh;
+a completed legacy empty/non-JSON 401 does.
+
+A usage ceiling can return HTTP 429 with `retryable: false`. Show suitable local
+copy for its stable code and let a workspace administrator review usage.
+Only documented, allowlisted error codes enter SDK error messages, stacks, and
+serialization; unknown codes become `daykeeper_request_failed`. Raw server
+messages, next-action URLs, and credential/transport errors are not copied.
+
+On logout or account change, abort outstanding calls, clear customer UI/history
+and in-memory token caches, and ignore results belonging to the old session.
+The headless SDK does not own the app's login state or persistent storage.
 
 ## Release status
 
