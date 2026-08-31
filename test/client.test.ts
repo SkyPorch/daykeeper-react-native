@@ -21,6 +21,12 @@ test("fetches a fresh customer token and preserves a gateway path", async () => 
   await client.listConversations();
   await client.listConversations();
 
+  for (const request of requests) {
+    assert.equal(request.cache, "no-store");
+    // Browser Fetch owns cache headers; do not add a new CORS request header.
+    assert.equal(request.headers.has("cache-control"), false);
+  }
+
   assert.equal(
     requests[0]?.url,
     "https://support.example.com/support-api/v1/conversations",

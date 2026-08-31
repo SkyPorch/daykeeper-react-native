@@ -19,6 +19,7 @@ async function testFiles(directory) {
 const files = await testFiles(join(root, "test"));
 if (!files.length) throw new Error("No SDK tests found");
 files.push(join(root, "smoke/boundary/server.test.mjs"));
+files.push(join(root, "smoke/cache/server.test.mjs"));
 const child = spawn(process.execPath, ["--import", "tsx", "--test", ...files], {
   cwd: root,
   stdio: "inherit",

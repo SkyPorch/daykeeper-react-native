@@ -49,11 +49,17 @@ The native export requires an explicit Fetch implementation. This example uses
 the host's existing Expo 57 installation; the SDK does not install Expo. Bare
 React Native applications may supply their own native Fetch implementation,
 but it must reject redirects before following them, omit ambient cookies,
-and support cancellation. The XHR-backed React Native global is not compliant;
+honor request Cache-Control directives, and support cancellation. The XHR-backed React Native global is not compliant;
 wrapping it or setting Fetch flags does not repair its redirect behavior. Do not
 pass it as the native transport. Omitting `fetch` fails before token acquisition.
 
-Every request sets `redirect: "error"` and `credentials: "omit"`. A custom Fetch
+Every request sets `redirect: "error"`, `credentials: "omit"`, and `cache: "no-store"`.
+The native export also sends `Cache-Control: no-cache, no-store`, because the
+validated Expo runtime ignores the standard Fetch cache option. This revalidates
+existing cache entries and prevents new storage, including across account
+changes. Node/web uses standard Fetch cache semantics without adding a custom
+browser request header. Keep the API's response `Cache-Control: no-store` too.
+A custom Fetch
 function is a caller-owned trust boundary: the SDK cannot prevent an injected
 implementation from ignoring those options. Use an exact HTTPS gateway URL,
 not one that redirects. Node/web exports can use standard global Fetch.
