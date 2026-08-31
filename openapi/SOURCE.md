@@ -2,19 +2,21 @@
 
 `customer.yaml` is an exact copy of `openapi/customer.yaml` from
 `SkyPorch/daykeeper-openapi`, commit
-`924dafc661952c2f97cb41e609e6b531c1f44a7b` (license metadata, PR #7).
+`6bcd7f2a299eb23093d0085890018a08090fc0e5` (customer usage errors, unreleased).
 
-- SHA-256: `5dcbefc60a33dc844cff452c0828abd4d462eac8685ca4e1192544bbeca97e4d`
-- Source Git blob: `6de29c4e6a80c9297a36579ddf19234b47ded8c8`
+- SHA-256: `b62dd386a87380f3fe94f968ff8fedf703ca6079199ea74057d32e31f91e1fec`
+- Source Git blob: `2f1b48fedaddfb7335389f75640e5e3b301575fb`
 - Tag status: unreleased commit snapshot; no new upstream tag is claimed.
 
 The released baseline is tag `v1.0.0`, commit
 `35f5bd45fe0c6a6901766543bff90dae6838b965`. Provider-neutral wording came from
 PR #5, commit `fec6f9b88661fbfd04b7d7c66acce257f15ea6bd`.
-This snapshot changes only `info.license` from that prior snapshot to match the
-contract's Apache-2.0 license. Operations, schemas, scopes, and generated
-TypeScript types are unchanged; PR #8 entitlement additions are not included.
-The SDK's existing MIT license is unchanged.
+License metadata was aligned in commit
+`924dafc661952c2f97cb41e609e6b531c1f44a7b`. This snapshot additionally adds optional
+customer-error message, retryability and next-action fields. Operations and
+scopes are unchanged; server-side entitlement/website schemas are not vendored.
+Generated customer types include the optional fields. The SDK's existing MIT
+license is unchanged.
 
 Release provenance must record an immutable `daykeeper-openapi` tag and its
 full commit SHA. Before release, update this snapshot record to that reviewed

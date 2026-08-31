@@ -214,9 +214,11 @@ export class DaykeeperReactNativeClient {
             status: response.status,
             code,
             retryable:
-              response.status === 408 ||
-              response.status === 429 ||
-              response.status >= 500,
+              isRecord(payload) && typeof payload.retryable === "boolean"
+                ? payload.retryable
+                : response.status === 408 ||
+                  response.status === 429 ||
+                  response.status >= 500,
           });
         }
         if (!isRecord(payload)) {

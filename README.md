@@ -74,6 +74,14 @@ code, distinct from network failures. Raw provider errors are not exposed.
 Handle sign-in recovery in the token provider or the application; deadline and
 caller cancellation still use their dedicated error codes.
 
+`DaykeeperReactNativeApiError.retryable` respects an explicit boolean from the
+server. A usage ceiling can return HTTP 429 with `retryable: false`; surface its
+stable `code` and let a workspace administrator review usage instead of replaying
+the write. Older responses without the hint keep status-based classification.
+No response body message or diagnostic is copied into SDK errors, and the SDK
+does not automatically retry these failures. Only the existing one-time 401
+credential refresh is automatic.
+
 ## Release status
 
 Version `0.1.1` is generated from the customer contract recorded in

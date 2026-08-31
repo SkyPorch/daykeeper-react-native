@@ -81,6 +81,77 @@ test("refreshes once after a stale token is rejected", async () => {
   assert.deepEqual(authorization, ["Bearer stale-token", "Bearer fresh-token"]);
 });
 
+test("honors explicit server retryability without replaying a quota-rejected write", async () => {
+  for (const responseFactory of [Response.json, reactNativeResponse]) {
+    let requests = 0;
+    let tokenCalls = 0;
+    const client = createDaykeeperReactNativeClient({
+      baseUrl: "https://support.example.test",
+      getAccessToken: () => {
+        tokenCalls++;
+        return "private-test-token";
+      },
+      fetch: async () => {
+        requests++;
+        const body = {
+          error: "daykeeper_usage_limit_exceeded",
+          message: "Private diagnostic must not enter an SDK error",
+          retryable: false,
+          nextAction: "review_usage",
+        };
+        return responseFactory === Response.json
+          ? Response.json(body, { status: 429 })
+          : reactNativeResponse(body, 429);
+      },
+    });
+    await assert.rejects(
+      client.sendMessage(42, "Synthetic support message"),
+      (error: unknown) => {
+        assert.ok(error instanceof DaykeeperReactNativeApiError);
+        assert.equal(error.code, "daykeeper_usage_limit_exceeded");
+        assert.equal(error.status, 429);
+        assert.equal(error.retryable, false);
+        assert.ok(!JSON.stringify(error).includes("Private diagnostic"));
+        assert.ok(!JSON.stringify(error).includes("private-test-token"));
+        return true;
+      },
+    );
+    assert.equal(requests, 1);
+    assert.equal(tokenCalls, 1);
+  }
+});
+
+test("legacy retry hints fall back to status and malformed values are ignored", async () => {
+  for (const [status, hint, expected] of [
+    [429, undefined, true],
+    [503, false, false],
+    [409, true, true],
+    [400, undefined, false],
+    [429, "false", true],
+    [429, null, true],
+    [429, 0, true],
+  ] as const) {
+    let requests = 0;
+    const client = createDaykeeperReactNativeClient({
+      baseUrl: "https://support.example.test",
+      getAccessToken: () => "token",
+      fetch: async () => {
+        requests++;
+        return Response.json(
+          { error: "synthetic_error", retryable: hint },
+          { status },
+        );
+      },
+    });
+    await assert.rejects(client.listConversations(), (error: unknown) => {
+      assert.ok(error instanceof DaykeeperReactNativeApiError);
+      assert.equal(error.retryable, expected);
+      return true;
+    });
+    assert.equal(requests, 1);
+  }
+});
+
 test("sends trimmed messages and validates conversation ids", async () => {
   let request: Request | undefined;
   const client = createDaykeeperReactNativeClient({
