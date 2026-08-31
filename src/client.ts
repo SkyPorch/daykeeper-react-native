@@ -25,7 +25,8 @@ const MAX_MESSAGE_LENGTH = 16_000;
 
 export interface DaykeeperReactNativeTokenProviderContext {
   /**
-   * True only after Daykeeper rejected the first token with HTTP 401. The
+   * True only after a GET rejected the first token with HTTP 401 and did not
+   * explicitly forbid replay with retryable: false. The
    * provider should bypass any token cache and exchange the app session again.
    */
   forceRefresh: boolean;
@@ -161,10 +162,14 @@ export class DaykeeperReactNativeClient {
     } = {},
   ): Promise<ResponseBody> {
     const lifetime = createRequestLifetime(this.#timeoutMs, options.signal);
+    const method = options.method ?? "GET";
+    const mutating = method !== "GET";
+    const attempts = mutating ? 1 : 2;
+    let dispatched = false;
     let response: Response | undefined;
 
     try {
-      for (let attempt = 0; attempt < 2; attempt += 1) {
+      for (let attempt = 0; attempt < attempts; attempt += 1) {
         const token = validateToken(
           await lifetime.run(() =>
             resolveToken(this.#getAccessToken, {
@@ -182,43 +187,58 @@ export class DaykeeperReactNativeClient {
         }
 
         try {
-          response = await lifetime.run(
-            () =>
-              this.#fetch(`${this.#baseUrl}${path}`, {
-                method: options.method ?? "GET",
-                body:
-                  options.body === undefined
-                    ? undefined
-                    : JSON.stringify(options.body),
-                headers,
-                signal: lifetime.signal,
-              }),
-            discardResponse,
-          );
+          response = await lifetime.run(() => {
+            dispatched = true;
+            return this.#fetch(`${this.#baseUrl}${path}`, {
+              method,
+              body:
+                options.body === undefined
+                  ? undefined
+                  : JSON.stringify(options.body),
+              headers,
+              signal: lifetime.signal,
+            });
+          }, discardResponse);
         } catch (error) {
           if (error instanceof DaykeeperReactNativeTransportError) throw error;
           throw networkError();
         }
 
-        if (response.status === 401 && attempt === 0) {
-          discardResponse(response);
-          continue;
+        let payload: unknown;
+        if (!mutating && response.status === 401 && attempt === 0) {
+          // Read explicit denial advice within the original deadline/size bound
+          // before deciding whether a credential refresh may replay this read.
+          try {
+            payload = await readJson(response, lifetime);
+          } catch (error) {
+            // A completed legacy non-JSON 401 has no structured hint. Failed,
+            // stalled, oversized, or cancelled reads never authorize a replay.
+            if (
+              !(error instanceof DaykeeperReactNativeTransportError) ||
+              error.code !== "INVALID_RESPONSE"
+            )
+              throw error;
+          }
+          if (!(isRecord(payload) && payload.retryable === false)) {
+            discardResponse(response);
+            continue;
+          }
+        } else {
+          payload = await readJson(response, lifetime);
         }
-        const payload = await readJson(response, lifetime);
         if (!response.ok) {
-          const code =
-            isRecord(payload) && typeof payload.error === "string"
-              ? payload.error
-              : "daykeeper_request_failed";
           throw new DaykeeperReactNativeApiError({
             status: response.status,
-            code,
+            code: isRecord(payload) ? payload.error : undefined,
             retryable:
-              isRecord(payload) && typeof payload.retryable === "boolean"
+              !mutating &&
+              (isRecord(payload) && typeof payload.retryable === "boolean"
                 ? payload.retryable
                 : response.status === 408 ||
                   response.status === 429 ||
-                  response.status >= 500,
+                  response.status >= 500),
+            outcomeUnknown:
+              mutating && (response.status === 408 || response.status >= 500),
           });
         }
         if (!isRecord(payload)) {
@@ -231,6 +251,19 @@ export class DaykeeperReactNativeClient {
         return payload as ResponseBody;
       }
       throw new Error("Unreachable Daykeeper request state");
+    } catch (error) {
+      if (error instanceof DaykeeperReactNativeApiError) throw error;
+      const safeError =
+        error instanceof DaykeeperReactNativeTransportError
+          ? error
+          : networkError();
+      if (!mutating) throw safeError;
+      throw new DaykeeperReactNativeTransportError({
+        code: safeError.code,
+        message: safeError.message,
+        retryable: false,
+        outcomeUnknown: dispatched,
+      });
     } finally {
       if (response) discardResponse(response);
       lifetime.dispose();
@@ -351,7 +384,7 @@ async function readJson(
     text = await lifetime.run(() => response.text());
   } catch (error) {
     if (error instanceof DaykeeperReactNativeTransportError) throw error;
-    throw invalidResponse();
+    throw networkError();
   }
   if (utf8LengthExceeds(text, MAX_RESPONSE_BYTES)) {
     throw responseTooLarge();
