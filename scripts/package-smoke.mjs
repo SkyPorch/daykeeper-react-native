@@ -13,6 +13,8 @@ import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { runReplayCases } from "../smoke/replay/cases.js";
 import { startFixture } from "../smoke/replay/server.mjs";
+import { runBoundaryCases } from "../smoke/boundary/cases.js";
+import { startBoundaryFixture } from "../smoke/boundary/server.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 await mkdir(join(root, ".smoke"), { recursive: true });
@@ -163,6 +165,36 @@ try {
 } finally {
   await fixture.close();
 }
+const boundaryFixture = await startBoundaryFixture();
+const boundaries = [];
+try {
+  for (const [name, sdk] of [
+    ["esm", esm],
+    ["cjs", cjs],
+  ]) {
+    for (const strict of [false, true]) {
+      const report = await runBoundaryCases(
+        sdk,
+        globalThis.fetch,
+        boundaryFixture.origin,
+        `${name}-${strict ? "strict" : "default"}`,
+        strict,
+      );
+      assert.equal(report.summary.cases, 56);
+      assert.equal(report.summary.redirects, 50);
+      assert.equal(report.summary.followed, strict ? 0 : 50);
+      assert.equal(report.summary.forwardedAuthorization, strict ? 0 : 25);
+      assert.equal(report.summary.forwardedBodies, strict ? 0 : 8);
+      assert.equal(report.summary.rejected, strict ? 50 : 0);
+      // Node has no ambient cookie jar; this is not native cookie certification.
+      assert.equal(report.cookie.controlPresent, false);
+      assert.equal(report.cookie.sourceReceived, false);
+      boundaries.push(report);
+    }
+  }
+} finally {
+  await boundaryFixture.close();
+}
 const result = {
   package: manifest.name,
   version: manifest.version,
@@ -180,6 +212,7 @@ const result = {
     "real loopback HTTP transport; no mocked fetch",
   ],
   runs,
+  boundaries,
 };
 await writeFile(
   join(directory, "result.json"),
@@ -194,6 +227,12 @@ console.log(
     {
       ...result,
       runs: runs.map(({ run, cases, calls }) => ({ run, cases, calls })),
+      boundaries: boundaries.map(({ run, strict, summary, cookie }) => ({
+        run,
+        strict,
+        summary,
+        cookie,
+      })),
     },
     null,
     2,

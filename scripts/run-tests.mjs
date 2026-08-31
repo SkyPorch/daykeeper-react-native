@@ -18,6 +18,7 @@ async function testFiles(directory) {
 // Enumerate explicitly so every supported version runs the same full suite.
 const files = await testFiles(join(root, "test"));
 if (!files.length) throw new Error("No SDK tests found");
+files.push(join(root, "smoke/boundary/server.test.mjs"));
 const child = spawn(process.execPath, ["--import", "tsx", "--test", ...files], {
   cwd: root,
   stdio: "inherit",

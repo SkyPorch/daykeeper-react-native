@@ -10,6 +10,12 @@ Push notifications, attachments, deep links, and native UI can be added here
 without coupling consuming applications to Daykeeper's private platform or to
 any infrastructure provider.
 
+Production certification is still open. The current default transport does not
+enforce redirect rejection or cookie isolation. Native networking may follow a
+redirect even when a Fetch option asks it not to. See the measured boundary and
+required follow-up in [`COMPATIBILITY.md`](COMPATIBILITY.md); a successful Metro
+build or Node test does not close this release gate.
+
 ## Install
 
 ```sh
