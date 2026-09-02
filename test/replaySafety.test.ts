@@ -277,10 +277,16 @@ for (const [name, write] of Object.entries(writes)) {
   });
 }
 
-test("untrusted API error codes cannot enter message, stack, or serialization", async () => {
+test("mis-shaped API error codes cannot enter message, stack, or serialization", async () => {
   for (const code of [
-    "private_diagnostic",
     "Bearer private-token",
+    "private diagnostic",
+    "Private_Diagnostic",
+    "private-diagnostic",
+    "_private_diagnostic",
+    "9private",
+    "ab",
+    `a${"b".repeat(64)}`,
     { private: "detail" },
     null,
     42,
@@ -304,7 +310,7 @@ test("untrusted API error codes cannot enter message, stack, or serialization", 
       assert.equal(error.message, "daykeeper_request_failed");
       assert.doesNotMatch(
         error.stack ?? "",
-        /private_diagnostic|private-token|private-message|private-action/,
+        /private_diagnostic|Private_Diagnostic|private-diagnostic|private-token|private-message|private-action/,
       );
       assert.ok(!JSON.stringify(error).includes("private"));
       return true;
