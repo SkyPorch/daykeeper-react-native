@@ -24,15 +24,36 @@ export function isDaykeeperApiErrorCode(value: unknown): value is string {
   return typeof value === "string" && API_CODE_SHAPE.test(value);
 }
 
+/**
+ * Contract-documented next steps. The envelope is open and its values are
+ * extensible, so an unrecognized hint is dropped rather than surfaced: a
+ * gateway string is untrusted and none of these grant account authority.
+ *
+ * This is deliberately narrower than the error-code rule above. A code is only
+ * ever compared by the app, so an unknown one is inert; a next action is a UI
+ * instruction the app acts on, so only the three the contract defines are
+ * allowed through.
+ */
+export type DaykeeperReactNativeNextAction =
+  "review_usage" | "review_setup" | "refresh_conversation";
+
+const SAFE_NEXT_ACTIONS = new Set<string>([
+  "review_usage",
+  "review_setup",
+  "refresh_conversation",
+]);
+
 export class DaykeeperReactNativeApiError extends Error {
   readonly status: number;
   readonly code: string;
   readonly retryable: boolean;
   readonly outcomeUnknown: boolean;
+  readonly nextAction?: DaykeeperReactNativeNextAction;
 
   constructor(options: {
     status: number;
     code?: unknown;
+    nextAction?: unknown;
     retryable?: boolean;
     outcomeUnknown?: boolean;
   }) {
@@ -45,6 +66,12 @@ export class DaykeeperReactNativeApiError extends Error {
     this.code = code;
     this.outcomeUnknown = options.outcomeUnknown ?? false;
     this.retryable = !this.outcomeUnknown && (options.retryable ?? false);
+    if (
+      typeof options.nextAction === "string" &&
+      SAFE_NEXT_ACTIONS.has(options.nextAction)
+    ) {
+      this.nextAction = options.nextAction as DaykeeperReactNativeNextAction;
+    }
   }
 
   toJSON(): {
@@ -53,6 +80,7 @@ export class DaykeeperReactNativeApiError extends Error {
     code: string;
     retryable: boolean;
     outcomeUnknown: boolean;
+    nextAction?: DaykeeperReactNativeNextAction;
   } {
     return {
       name: this.name,
@@ -60,6 +88,7 @@ export class DaykeeperReactNativeApiError extends Error {
       code: this.code,
       retryable: this.retryable,
       outcomeUnknown: this.outcomeUnknown,
+      ...(this.nextAction === undefined ? {} : { nextAction: this.nextAction }),
     };
   }
 }

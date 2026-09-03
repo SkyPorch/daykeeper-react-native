@@ -245,6 +245,9 @@ export class DaykeeperReactNativeClient {
           throw new DaykeeperReactNativeApiError({
             status: response.status,
             code: isRecord(payload) ? payload.error : undefined,
+            // The contract's message stays unread; only the bounded
+            // nextAction vocabulary is projected.
+            nextAction: isRecord(payload) ? payload.nextAction : undefined,
             retryable:
               !mutating &&
               (isRecord(payload) && typeof payload.retryable === "boolean"
