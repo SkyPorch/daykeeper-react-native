@@ -26,5 +26,9 @@ license is unchanged.
 
 Release provenance must record an immutable `daykeeper-openapi` tag and its
 full commit SHA. Before release, update this snapshot record to that reviewed
-tag and verify the contract checksum. CI regenerates TypeScript declarations
-and fails when the committed output differs.
+tag and verify the contract checksum. `pnpm check:generated` runs
+`scripts/check-generated.mjs`, which recomputes the checksum and Git blob id
+recorded above, requires them and the commit to appear in this file, and
+regenerates the TypeScript declarations into a temporary directory to compare
+against the committed output. Editing the contract without updating this
+record fails the check.
