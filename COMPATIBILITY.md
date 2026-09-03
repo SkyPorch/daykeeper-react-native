@@ -2,11 +2,11 @@
 
 ## Version matrix
 
-| Package version | Contract consumed | Contract version | Contract tag | Contract commit |
-| --- | --- | --- | --- | --- |
-| `0.2.0` (unreleased) | customer (`openapi/customer.yaml`) | 0.1.0 | none yet — snapshot of an unreleased upstream commit; an immutable `vMAJOR.MINOR.PATCH` tag must be recorded before release | `4a2b82c9b23503073dc26fdeb5163e8869d007b8` |
-| `0.1.0` (published) | customer (`openapi/customer.yaml`) | 0.1.0 | `v1.0.0` | `35f5bd45fe0c6a6901766543bff90dae6838b965` |
-| any | management (`openapi/daykeeper.yaml`) | 0.2.0 | not consumed here | not consumed here |
+| Package version      | Contract consumed                     | Contract version | Contract tag                                                                                                                | Contract commit                            |
+| -------------------- | ------------------------------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| `0.2.0` (unreleased) | customer (`openapi/customer.yaml`)    | 0.1.0            | none yet — snapshot of an unreleased upstream commit; an immutable `vMAJOR.MINOR.PATCH` tag must be recorded before release | `4a2b82c9b23503073dc26fdeb5163e8869d007b8` |
+| `0.1.0` (published)  | customer (`openapi/customer.yaml`)    | 0.1.0            | `v1.0.0`                                                                                                                    | `35f5bd45fe0c6a6901766543bff90dae6838b965` |
+| any                  | management (`openapi/daykeeper.yaml`) | 0.2.0            | not consumed here                                                                                                           | not consumed here                          |
 
 This package consumes only the **customer** contract. The customer contract is
 still 0.1.0 and has no `Idempotency-Key` header. The now-required

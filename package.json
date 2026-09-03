@@ -36,7 +36,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "generate": "openapi-typescript openapi/customer.yaml --output src/generated/schema.ts",
-    "pack:check": "npm pack --dry-run --json",
+    "pack:check": "npm pack --dry-run --json && node scripts/verify-pack.mjs",
     "smoke:package": "node scripts/package-smoke.mjs",
     "smoke:metro": "react-native bundle --platform ios --dev false --entry-file smoke/index.js --bundle-output .smoke/ios.jsbundle && react-native bundle --platform android --dev false --entry-file smoke/index.js --bundle-output .smoke/android.jsbundle",
     "test": "node scripts/run-tests.mjs",

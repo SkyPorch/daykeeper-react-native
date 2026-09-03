@@ -28,7 +28,7 @@ Follow these steps in this order. Do not start a release out of order.
    `VERSIONING.md` makes released tags immutable; a release cannot record a
    branch head.
 2. **Point `openapi/SOURCE.md` at that tag.** Update the vendored snapshot
-   record to the immutable tag *and* its full commit SHA, and re-verify the
+   record to the immutable tag _and_ its full commit SHA, and re-verify the
    contract checksum with `pnpm check:generated`. Never record a branch head or
    an unmerged pull request head. `openapi/SOURCE.md` currently records an
    unreleased upstream commit, so it must be updated before any release.
