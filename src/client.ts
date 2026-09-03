@@ -208,14 +208,22 @@ export class DaykeeperReactNativeClient {
           throw networkError();
         }
 
+        // A read that may still refresh its credentials once, on the first
+        // 401 only, unless the server explicitly forbids the replay.
+        const refreshCandidate =
+          !mutating && response.status === 401 && attempt === 0;
+
         let payload: unknown;
-        if (!mutating && response.status === 401 && attempt === 0) {
-          // Read explicit denial advice within the original deadline/size bound
-          // before deciding whether a credential refresh may replay this read.
+        if (refreshCandidate || !response.ok) {
+          // The HTTP status decides the outcome, so the body is read for
+          // advice only. A gateway, proxy or CDN can answer any error status
+          // with an HTML page instead of the contract envelope; parsing that
+          // first used to throw INVALID_RESPONSE and lose both the status and,
+          // on a 401, the one permitted credential refresh.
           try {
             payload = await readJson(response, lifetime);
           } catch (error) {
-            // A completed legacy non-JSON 401 has no structured hint. Failed,
+            // Only a completed, unparseable body is tolerated. Failed,
             // stalled, oversized, or cancelled reads never authorize a replay.
             if (
               !(error instanceof DaykeeperReactNativeTransportError) ||
@@ -223,17 +231,23 @@ export class DaykeeperReactNativeClient {
             )
               throw error;
           }
-          if (!(isRecord(payload) && payload.retryable === false)) {
-            discardResponse(response);
-            continue;
-          }
         } else {
           payload = await readJson(response, lifetime);
+        }
+        if (
+          refreshCandidate &&
+          !(isRecord(payload) && payload.retryable === false)
+        ) {
+          discardResponse(response);
+          continue;
         }
         if (!response.ok) {
           throw new DaykeeperReactNativeApiError({
             status: response.status,
             code: isRecord(payload) ? payload.error : undefined,
+            // The contract's message stays unread; only the bounded
+            // nextAction vocabulary is projected.
+            nextAction: isRecord(payload) ? payload.nextAction : undefined,
             retryable:
               !mutating &&
               (isRecord(payload) && typeof payload.retryable === "boolean"
@@ -310,7 +324,10 @@ function parseBaseUrl(value: string): string {
   } catch {
     throw configurationError("baseUrl must be a valid absolute URL");
   }
-  const local = ["localhost", "127.0.0.1", "::1"].includes(url.hostname);
+  // URL.hostname keeps the brackets around an IPv6 literal, so a bare "::1"
+  // comparison never matched http://[::1]:3002 and rejected local development.
+  const hostname = url.hostname.replace(/^\[(.+)]$/, "$1").toLowerCase();
+  const local = ["localhost", "127.0.0.1", "::1"].includes(hostname);
   if (url.protocol !== "https:" && !(local && url.protocol === "http:")) {
     throw configurationError(
       "baseUrl must use HTTPS except for loopback development",

@@ -2,6 +2,36 @@
 
 ## 0.2.0 (unreleased)
 
+The unreleased candidate that began as `0.1.1` was renamed `0.2.0` for the
+native transport break. `0.1.0` remains the published baseline; `package.json`
+is not bumped by these entries.
+
+- Preserve every server error code whose shape is a code. Codes matching
+  `^[a-z][a-z0-9_]{2,63}$` pass through unchanged; only values that fail that
+  shape collapse to `daykeeper_request_failed`. The previous 23-entry
+  allowlist collapsed live gateway codes the consuming app switches on, such
+  as `support_gateway_request_failed`, `widget_token_required`,
+  `invalid_tenant` and `conversation_not_found`. Message projection is
+  unchanged: no raw body text enters the message, stack or serialization.
+- Decide on the HTTP status before parsing an error body. An HTML error page
+  from a proxy or CDN no longer discards the status as `INVALID_RESPONSE`, and
+  a non-JSON 401 still authorizes the single credential refresh on reads.
+- Accept `http://[::1]` and other bracketed IPv6 loopback base URLs for local
+  development. The loopback check compared against an unbracketed `::1` and
+  never matched.
+- Expose `DaykeeperReactNativeApiError.nextAction`, projected through a closed
+  allowlist of `review_usage`, `review_setup` and `refresh_conversation` and
+  included in `toJSON` when present. Unrecognized values become `undefined`.
+  The contract's `message` field remains unread.
+- Verify the vendored contract's provenance in `check:generated`. The new
+  `scripts/check-generated.mjs` recomputes the SHA-256 and Git blob id of
+  `openapi/customer.yaml`, requires both plus the upstream commit to appear in
+  `openapi/SOURCE.md`, and regenerates types into a temporary directory, so a
+  contract edit can no longer pass by regenerating alongside it.
+- Re-vendor the customer contract from `daykeeper-openapi` commit `4a2b82c`,
+  where `CustomerError` is `additionalProperties: true` and the `error` code is
+  documented as extensible.
+
 - Set `cache: "no-store"` on every dispatch. Native exports also send
   `Cache-Control: no-cache, no-store` for transports that ignore Fetch cache mode.
   Keep browser cache headers under standard Fetch control to avoid changing CORS.

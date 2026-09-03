@@ -32,7 +32,7 @@
   "scripts": {
     "build": "tsup src/index.ts src/native.ts --format esm,cjs --dts --sourcemap --target es2020 --clean",
     "check": "pnpm format:check && pnpm check:generated && pnpm typecheck && pnpm test && pnpm build && pnpm verify:exports && pnpm smoke:package && pnpm smoke:metro && pnpm pack:check",
-    "check:generated": "pnpm generate && git diff --exit-code -- src/generated/schema.ts",
+    "check:generated": "node scripts/check-generated.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "generate": "openapi-typescript openapi/customer.yaml --output src/generated/schema.ts",

@@ -31,6 +31,28 @@ Tokens must be short-lived and customer-scoped. Keep them in memory where
 possible; if persistence is unavoidable, use an OS-backed secret store and
 never AsyncStorage.
 
+## Error codes: open vocabulary
+
+The gateway's error vocabulary is open and grows without an SDK release, so
+the SDK does not keep a list of known codes. Any `error` value shaped like a
+code -- ASCII lowercase snake_case, 3 to 64 characters, matching
+`^[a-z][a-z0-9_]{2,63}$` -- reaches the caller as
+`DaykeeperReactNativeApiError.code` unchanged, including codes newer than the
+installed SDK. Anything else, including the free-form English messages the
+gateway returns for some 4xx failures, collapses to
+`daykeeper_request_failed`. The error message is always the code alone: the
+contract's `message` and `nextAction` fields are never projected into the
+message, stack or serialization. Consuming apps must still handle an unknown
+code safely, and must not treat `daykeeper_request_failed` as a specific
+condition.
+
+`nextAction` is the exception and stays a closed vocabulary of exactly
+`review_usage`, `review_setup` and `refresh_conversation`, typed as
+`DaykeeperReactNativeNextAction`. A code is only ever compared, so an unknown
+one is inert; a next action is an instruction the app acts on, so an
+unrecognized value is dropped to `undefined` and omitted from serialization
+rather than surfaced. The contract's `message` field is still never read.
+
 ## Native network boundary: release gate
 
 Candidate 0.2.0 sets strict redirect/cookie policy on every dispatch and refuses
