@@ -2,9 +2,32 @@
 
 ## 0.2.0 (unreleased)
 
-The unreleased candidate that began as `0.1.1` was renamed `0.2.0` for the
-native transport break. `0.1.0` remains the published baseline; `package.json`
-is not bumped by these entries.
+The unreleased candidate that began as `0.1.1` was renumbered `0.2.0` for the
+native transport break, and `package.json` now reads `0.2.0`. Nothing in this
+repository claims `0.1.1` as a release version. `0.1.0` remains the published
+baseline on npm until this version is approved and released.
+
+### Breaking
+
+- **Native transport must be configured explicitly.** The native export no
+  longer falls back to React Native's XHR-based Fetch. Callers must supply a
+  `fetch` implementation that rejects redirects and omits ambient cookies; on
+  the validated Expo 57 runtime, `fetch` from `expo/fetch`. A client
+  constructed without one now fails before credentials are requested.
+- **Server error codes pass through instead of being allowlisted.** Any value
+  matching `^[a-z][a-z0-9_]{2,63}$` reaches
+  `DaykeeperReactNativeApiError.code` unchanged, including codes newer than the
+  installed SDK. Code that assumed the previous 23-entry allowlist — and so
+  assumed unknown codes arrived as `daykeeper_request_failed` — must handle an
+  open vocabulary.
+
+This package consumes the **customer** contract only, which remains 0.1.0. The
+newly required `Idempotency-Key` header on flow mutations, and the `200`
+returned alongside `201` for a replayed mutation, are **management** contract
+0.2.0 changes and do not apply here. The breaking changes above are this
+package's own. See [`COMPATIBILITY.md`](COMPATIBILITY.md).
+
+### Changes
 
 - Preserve every server error code whose shape is a code. Codes matching
   `^[a-z][a-z0-9_]{2,63}$` pass through unchanged; only values that fail that
@@ -48,8 +71,9 @@ is not bumped by these entries.
 - Verify native and Node ESM/CJS exports, declarations and installed-package
   policy behavior independently. Android/release certification remains open.
 
-The following changes were developed in the unpublished `0.1.1` candidate and
-are included here; `0.1.0` remains the published baseline until release approval.
+The following changes were developed in the candidate previously numbered
+`0.1.1` and ship as part of `0.2.0`; `0.1.0` remains the published baseline
+until release approval.
 
 - Never replay writes after authentication failure; classify uncertain write
   outcomes explicitly and make all write errors non-retryable.
