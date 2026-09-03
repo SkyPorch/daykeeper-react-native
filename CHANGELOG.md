@@ -19,6 +19,15 @@ is not bumped by these entries.
 - Accept `http://[::1]` and other bracketed IPv6 loopback base URLs for local
   development. The loopback check compared against an unbracketed `::1` and
   never matched.
+- Expose `DaykeeperReactNativeApiError.nextAction`, projected through a closed
+  allowlist of `review_usage`, `review_setup` and `refresh_conversation` and
+  included in `toJSON` when present. Unrecognized values become `undefined`.
+  The contract's `message` field remains unread.
+- Verify the vendored contract's provenance in `check:generated`. The new
+  `scripts/check-generated.mjs` recomputes the SHA-256 and Git blob id of
+  `openapi/customer.yaml`, requires both plus the upstream commit to appear in
+  `openapi/SOURCE.md`, and regenerates types into a temporary directory, so a
+  contract edit can no longer pass by regenerating alongside it.
 - Re-vendor the customer contract from `daykeeper-openapi` commit `4a2b82c`,
   where `CustomerError` is `additionalProperties: true` and the `error` code is
   documented as extensible.

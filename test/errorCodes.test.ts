@@ -4,6 +4,7 @@ import {
   DaykeeperReactNativeClient as Client,
   DaykeeperReactNativeApiError as ApiError,
 } from "../src/index.ts";
+import { isDaykeeperApiErrorCode } from "../src/errors.ts";
 
 /**
  * Every error code the Daykeeper support gateway can put in the customer-facing
@@ -72,10 +73,66 @@ for (const code of GATEWAY_ERROR_CODES) {
 }
 
 test("every enumerated gateway code has the documented shape", () => {
+  // Ask the SDK's own predicate rather than restating the pattern here, so a
+  // change to the rule cannot pass a test that quietly kept the old one.
   for (const code of GATEWAY_ERROR_CODES) {
-    assert.match(code, /^[a-z][a-z0-9_]{2,63}$/, code);
+    assert.ok(isDaykeeperApiErrorCode(code), code);
   }
   assert.equal(new Set(GATEWAY_ERROR_CODES).size, GATEWAY_ERROR_CODES.length);
+});
+
+test("isDaykeeperApiErrorCode accepts only code-shaped strings", () => {
+  for (const value of [
+    "abc",
+    "not_found",
+    "a1_b2_c3",
+    "a".repeat(64),
+    "support_upstream_rejected",
+  ]) {
+    assert.ok(isDaykeeperApiErrorCode(value), JSON.stringify(value));
+  }
+
+  for (const value of [
+    "ab", // shorter than the minimum
+    "a".repeat(65), // longer than the maximum
+    "", // empty
+    "Not_Found", // upper case
+    "not-found", // hyphen
+    "not found", // whitespace
+    " not_found", // leading whitespace
+    "not_found\n", // trailing newline
+    "_not_found", // leading underscore
+    "1not_found", // leading digit
+    "not_found\u0000", // embedded NUL
+    "nöt_found", // non-ASCII
+    // A non-string can still look like a code once coerced. The predicate must
+    // reject the value itself rather than anything it can be turned into.
+    ["not_found"],
+    { toString: () => "not_found" },
+    { valueOf: () => "not_found" },
+    new String("not_found"),
+    null,
+    undefined,
+    42,
+    true,
+    Symbol("not_found"),
+  ]) {
+    assert.equal(isDaykeeperApiErrorCode(value), false, String(value));
+  }
+});
+
+test("a coercible object error code never reaches the caller", async () => {
+  for (const code of [
+    ["support_upstream_rejected"],
+    { toString: () => "support_upstream_rejected" },
+  ]) {
+    await assert.rejects(client({ error: code }, 502).getUnread(), (error) => {
+      assert.ok(error instanceof ApiError);
+      assert.equal(error.code, "daykeeper_request_failed");
+      assert.equal(error.message, "daykeeper_request_failed");
+      return true;
+    });
+  }
 });
 
 test("a code the SDK has never seen is still handed to the caller", async () => {
@@ -111,7 +168,8 @@ test("free-form gateway messages collapse instead of leaking prose", async () =>
       assert.ok(error instanceof ApiError);
       assert.equal(error.code, "daykeeper_request_failed");
       assert.equal(error.message, "daykeeper_request_failed");
-      assert.ok(!JSON.stringify(error).includes(prose.split(" ")[1] ?? ""));
+      assert.ok(!JSON.stringify(error).includes(prose));
+      assert.ok(!(error.stack ?? "").includes(prose));
       return true;
     });
   }
@@ -147,6 +205,74 @@ test("a 429 without retry advice keeps status-based retryability", async () => {
     (error) => {
       assert.ok(error instanceof ApiError);
       assert.equal(error.retryable, true);
+      return true;
+    },
+  );
+});
+
+test("the contract nextAction is projected through a closed allowlist", async () => {
+  for (const nextAction of [
+    "review_usage",
+    "review_setup",
+    "refresh_conversation",
+  ] as const) {
+    await assert.rejects(
+      client(
+        { error: "daykeeper_usage_limit_exceeded", nextAction },
+        429,
+      ).getUnread(),
+      (error) => {
+        assert.ok(error instanceof ApiError);
+        assert.equal(error.nextAction, nextAction);
+        assert.equal(JSON.parse(JSON.stringify(error)).nextAction, nextAction);
+        return true;
+      },
+    );
+  }
+});
+
+test("an unrecognized nextAction collapses to undefined", async () => {
+  // Unlike a code, a next action is an instruction the app acts on, so the
+  // vocabulary stays closed: an unknown hint is dropped, not surfaced.
+  for (const nextAction of [
+    "review_billing",
+    "contact_support",
+    "Review_Usage",
+    "review usage",
+    "",
+    ["review_usage"],
+    { toString: () => "review_usage" },
+    null,
+    42,
+    true,
+  ]) {
+    await assert.rejects(
+      client(
+        { error: "daykeeper_usage_limit_exceeded", nextAction },
+        429,
+      ).getUnread(),
+      (error) => {
+        assert.ok(error instanceof ApiError);
+        assert.equal(error.nextAction, undefined);
+        const serialized = JSON.parse(JSON.stringify(error)) as Record<
+          string,
+          unknown
+        >;
+        assert.ok(!("nextAction" in serialized));
+        assert.ok(!JSON.stringify(error).includes("review_billing"));
+        return true;
+      },
+    );
+  }
+});
+
+test("an absent nextAction stays absent from serialization", async () => {
+  await assert.rejects(
+    client({ error: "not_found" }, 404).getUnread(),
+    (error) => {
+      assert.ok(error instanceof ApiError);
+      assert.equal(error.nextAction, undefined);
+      assert.ok(!("nextAction" in JSON.parse(JSON.stringify(error))));
       return true;
     },
   );

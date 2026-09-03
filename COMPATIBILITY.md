@@ -46,6 +46,13 @@ message, stack or serialization. Consuming apps must still handle an unknown
 code safely, and must not treat `daykeeper_request_failed` as a specific
 condition.
 
+`nextAction` is the exception and stays a closed vocabulary of exactly
+`review_usage`, `review_setup` and `refresh_conversation`, typed as
+`DaykeeperReactNativeNextAction`. A code is only ever compared, so an unknown
+one is inert; a next action is an instruction the app acts on, so an
+unrecognized value is dropped to `undefined` and omitted from serialization
+rather than surfaced. The contract's `message` field is still never read.
+
 ## Native network boundary: release gate
 
 Candidate 0.2.0 sets strict redirect/cookie policy on every dispatch and refuses
