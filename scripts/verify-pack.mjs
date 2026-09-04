@@ -52,10 +52,15 @@ const walk = async (directory) => {
 const packAndExtract = async (directory) => {
   const output = await run(
     "npm",
-    ["pack", "--json", "--pack-destination", directory],
+    ["pack", "--ignore-scripts", "--json", "--pack-destination", directory],
     root,
   );
-  const [result] = JSON.parse(output.slice(output.indexOf("[")));
+  // `pack:check` runs npm's prepack build before this verifier. Do not run the
+  // lifecycle a second time here: tsup's coloured progress output is written
+  // to stdout, where it can be mistaken for npm's JSON (the ANSI escape starts
+  // with `[`). Packing the already-built tree also makes this comparison about
+  // the artifact bytes, rather than two independent build log streams.
+  const [result] = JSON.parse(output);
   const tarball = join(directory, result.filename);
   const extracted = join(directory, "extracted");
   await mkdir(extracted, { recursive: true });
