@@ -171,6 +171,41 @@ test("stream reads and non-cooperative cancellation cannot outlive the deadline"
   assert.equal(cancellations, 1);
 });
 
+test("oversized stream cleanup is best effort and cannot mask the safe error", async () => {
+  let cancellations = 0;
+  const reader = {
+    read: async () => ({
+      done: false,
+      value: new Uint8Array(1024 * 1024 + 1),
+    }),
+    cancel: () => {
+      cancellations++;
+      throw new Error("remote-secret-cancel");
+    },
+    releaseLock: () => {
+      throw new Error("remote-secret-release");
+    },
+  };
+  const client = createDaykeeperReactNativeClient({
+    baseUrl: "https://support.example.test",
+    getAccessToken: () => "customer-token",
+    fetch: async () =>
+      ({
+        status: 200,
+        ok: true,
+        headers: new Headers(),
+        body: { getReader: () => reader },
+      }) as unknown as Response,
+  });
+
+  await rejectsBoundedly(
+    client.createConversation(),
+    "RESPONSE_TOO_LARGE",
+    true,
+  );
+  assert.equal(cancellations, 1);
+});
+
 test("buffered native response parsing shares the request deadline", async () => {
   const client = createDaykeeperReactNativeClient({
     baseUrl: "https://support.example.test",

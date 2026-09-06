@@ -519,7 +519,11 @@ async function readStream(
   const cancel = () => {
     if (cancelled) return;
     cancelled = true;
-    void reader.cancel().catch(() => {});
+    try {
+      void Promise.resolve(reader.cancel()).catch(() => {});
+    } catch {
+      // Cleanup must not replace the bounded, sanitized request error.
+    }
   };
   if (signal?.aborted) cancel();
   else signal?.addEventListener("abort", cancel, { once: true });
@@ -529,14 +533,18 @@ async function readStream(
       if (done) break;
       total += value.byteLength;
       if (total > MAX_RESPONSE_BYTES) {
-        await reader.cancel();
+        cancel();
         throw responseTooLarge();
       }
       chunks.push(value);
     }
   } finally {
     signal?.removeEventListener("abort", cancel);
-    reader.releaseLock();
+    try {
+      reader.releaseLock();
+    } catch {
+      // Cleanup must not replace the bounded, sanitized request error.
+    }
   }
 
   const bytes = new Uint8Array(total);
