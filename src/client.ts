@@ -194,12 +194,14 @@ export class DaykeeperReactNativeClient {
       timeoutController.abort();
     }, this.#timeoutMs);
     const onCallerAbort = () => timeoutController.abort();
+    const mutating = options.method === "POST";
+    let dispatched = false;
     if (options.signal?.aborted) timeoutController.abort();
     else
       options.signal?.addEventListener("abort", onCallerAbort, { once: true });
 
     try {
-      for (let attempt = 0; attempt < 2; attempt += 1) {
+      for (let attempt = 0; attempt < (mutating ? 1 : 2); attempt += 1) {
         const token = validateToken(
           await this.#getAccessToken({ forceRefresh: attempt === 1 }),
         );
@@ -213,6 +215,15 @@ export class DaykeeperReactNativeClient {
 
         let response: Response;
         try {
+          if (timedOut || options.signal?.aborted) {
+            throw new DaykeeperReactNativeTransportError({
+              code: timedOut ? "REQUEST_TIMEOUT" : "REQUEST_ABORTED",
+              message: timedOut
+                ? `The Daykeeper request exceeded ${this.#timeoutMs}ms`
+                : "The Daykeeper request was aborted",
+            });
+          }
+          dispatched = true;
           response = await this.#fetch(`${this.#baseUrl}${path}`, {
             method: options.method ?? "GET",
             body:
@@ -228,23 +239,70 @@ export class DaykeeperReactNativeClient {
               code: "REQUEST_TIMEOUT",
               message: `The Daykeeper request exceeded ${this.#timeoutMs}ms`,
               retryable: true,
+              outcomeUnknown: mutating && dispatched,
             });
           }
           if (options.signal?.aborted) {
             throw new DaykeeperReactNativeTransportError({
               code: "REQUEST_ABORTED",
               message: "The Daykeeper request was aborted",
+              outcomeUnknown: mutating && dispatched,
             });
           }
           throw new DaykeeperReactNativeTransportError({
             code: "NETWORK_ERROR",
             message: "The Daykeeper customer API could not be reached",
             retryable: true,
+            outcomeUnknown: mutating && dispatched,
           });
         }
 
-        const payload = await readJson(response);
-        if (response.status === 401 && attempt === 0) continue;
+        let payload: unknown;
+        try {
+          payload = await readJson(response);
+        } catch (error) {
+          if (mutating && dispatched) {
+            if (timedOut) {
+              throw new DaykeeperReactNativeTransportError({
+                code: "REQUEST_TIMEOUT",
+                message: `The Daykeeper request exceeded ${this.#timeoutMs}ms`,
+                outcomeUnknown: true,
+              });
+            }
+            if (options.signal?.aborted) {
+              throw new DaykeeperReactNativeTransportError({
+                code: "REQUEST_ABORTED",
+                message: "The Daykeeper request was aborted",
+                outcomeUnknown: true,
+              });
+            }
+            if (error instanceof DaykeeperReactNativeTransportError) {
+              throw new DaykeeperReactNativeTransportError({
+                code: error.code,
+                message: error.message,
+                outcomeUnknown: true,
+              });
+            }
+            throw new DaykeeperReactNativeTransportError({
+              code: "INVALID_RESPONSE",
+              message: "The Daykeeper customer API returned invalid JSON",
+              outcomeUnknown: true,
+            });
+          }
+          if (error instanceof DaykeeperReactNativeTransportError) throw error;
+          throw new DaykeeperReactNativeTransportError({
+            code: "INVALID_RESPONSE",
+            message: "The Daykeeper customer API returned an invalid response",
+            retryable: true,
+          });
+        }
+        if (
+          !mutating &&
+          response.status === 401 &&
+          attempt === 0 &&
+          !(isRecord(payload) && payload.retryable === false)
+        )
+          continue;
         if (!response.ok) {
           const code =
             isRecord(payload) &&
@@ -256,9 +314,15 @@ export class DaykeeperReactNativeClient {
             status: response.status,
             code,
             retryable:
-              response.status === 408 ||
-              response.status === 429 ||
-              response.status >= 500,
+              !mutating &&
+              code !== "widget_unavailable" &&
+              (isRecord(payload) && typeof payload.retryable === "boolean"
+                ? payload.retryable
+                : response.status === 408 ||
+                  response.status === 429 ||
+                  response.status >= 500),
+            outcomeUnknown:
+              mutating && (response.status === 408 || response.status >= 500),
           });
         }
         if (!isRecord(payload)) {
@@ -266,6 +330,7 @@ export class DaykeeperReactNativeClient {
             code: "INVALID_RESPONSE",
             message: "The Daykeeper customer API returned an invalid response",
             retryable: true,
+            outcomeUnknown: mutating && dispatched,
           });
         }
         return payload as ResponseBody;

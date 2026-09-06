@@ -44,10 +44,15 @@ const { conversations } = await daykeeper.listConversations();
 ```
 
 The token provider runs for every request so the consuming app can rotate
-short-lived credentials. If the gateway returns HTTP 401, the SDK asks the
-provider for one forced refresh and retries exactly once. Keep customer tokens
-in memory where possible. Never place them in URLs, analytics, crash reports,
-or application logs.
+short-lived credentials. A GET may ask the provider for one forced refresh
+after HTTP 401 unless the response says `retryable: false`; writes make one
+SDK attempt and are never refreshed and replayed. Keep customer tokens in
+memory where possible. Never place them in URLs, analytics, crash reports, or
+application logs.
+
+The request timeout cannot forcibly stop a token provider that never resolves;
+implement providers with their own bounded backend operation so a late token is
+not produced after the caller has abandoned the request.
 
 ## API
 
@@ -59,6 +64,12 @@ or application logs.
 
 See [`COMPATIBILITY.md`](COMPATIBILITY.md) for the supported runtime contract
 and release certification matrix.
+
+When a dispatched write fails during transport, times out, returns an ambiguous
+408/5xx, or has an invalid success response, `outcomeUnknown` is true and
+`retryable` is false: read current server state before deciding on a deliberate
+new action. Pre-dispatch failures remain ordinary retryable transport errors
+where appropriate.
 
 ## Release status
 

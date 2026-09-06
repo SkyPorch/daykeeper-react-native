@@ -81,6 +81,232 @@ test("API-only widget operations surface 409 without retrying or exposing arbitr
   assert.equal(requests, 2);
 });
 
+test("writes never refresh or replay after a 401", async () => {
+  let requests = 0;
+  const refreshRequests: boolean[] = [];
+  const client = createDaykeeperReactNativeClient({
+    baseUrl: "https://support.example.com",
+    getAccessToken: ({ forceRefresh }) => {
+      refreshRequests.push(forceRefresh);
+      return "customer-token";
+    },
+    fetch: async () => {
+      requests++;
+      return Response.json({ error: "expired_token" }, { status: 401 });
+    },
+  });
+  await assert.rejects(client.sendMessage(7, "hello"), (error) => {
+    assert(error instanceof DaykeeperReactNativeApiError);
+    assert.equal(error.status, 401);
+    assert.equal(error.outcomeUnknown, false);
+    assert.equal(error.retryable, false);
+    return true;
+  });
+  assert.equal(requests, 1);
+  assert.deepEqual(refreshRequests, [false]);
+});
+
+test("reads honor retryable false on 401 and status errors", async () => {
+  let requests = 0;
+  const refreshRequests: boolean[] = [];
+  const client = createDaykeeperReactNativeClient({
+    baseUrl: "https://support.example.com",
+    getAccessToken: ({ forceRefresh }) => {
+      refreshRequests.push(forceRefresh);
+      return "customer-token";
+    },
+    fetch: async () => {
+      requests++;
+      return Response.json(
+        { error: "rate_limited", retryable: false },
+        { status: 429 },
+      );
+    },
+  });
+  await assert.rejects(client.getUnread(), (error) => {
+    assert(error instanceof DaykeeperReactNativeApiError);
+    assert.equal(error.retryable, false);
+    assert.equal(error.outcomeUnknown, false);
+    return true;
+  });
+  assert.equal(requests, 1);
+  assert.deepEqual(refreshRequests, [false]);
+});
+
+test("reads do not refresh after an explicit 401 retry veto", async () => {
+  let requests = 0;
+  const refreshRequests: boolean[] = [];
+  const client = createDaykeeperReactNativeClient({
+    baseUrl: "https://support.example.com",
+    getAccessToken: ({ forceRefresh }) => {
+      refreshRequests.push(forceRefresh);
+      return "customer-token";
+    },
+    fetch: async () => {
+      requests++;
+      return Response.json(
+        { error: "expired_token", retryable: false },
+        { status: 401 },
+      );
+    },
+  });
+  await assert.rejects(client.getUnread(), (error) => {
+    assert(error instanceof DaykeeperReactNativeApiError);
+    assert.equal(error.code, "expired_token");
+    assert.equal(error.retryable, false);
+    return true;
+  });
+  assert.equal(requests, 1);
+  assert.deepEqual(refreshRequests, [false]);
+});
+
+test("dispatched write transport and invalid responses are unknown and non-retryable", async () => {
+  for (const fetch of [
+    async () => {
+      throw new Error("lost response");
+    },
+    async () =>
+      Response.json({ error: "support_upstream_unavailable" }, { status: 503 }),
+    async () => new Response("not-json", { status: 200 }),
+  ]) {
+    const client = createDaykeeperReactNativeClient({
+      baseUrl: "https://support.example.com",
+      getAccessToken: () => "customer-token",
+      fetch,
+    });
+    await assert.rejects(client.createConversation(), (error) => {
+      assert(
+        error instanceof DaykeeperReactNativeApiError ||
+          error instanceof DaykeeperReactNativeTransportError,
+      );
+      assert.equal(error.outcomeUnknown, true);
+      assert.equal(error.retryable, false);
+      return true;
+    });
+  }
+});
+
+test("malformed response streams become safe unknown write failures", async () => {
+  const client = createDaykeeperReactNativeClient({
+    baseUrl: "https://support.example.com",
+    getAccessToken: () => "customer-token",
+    fetch: async () =>
+      new Response(
+        new ReadableStream({
+          pull() {
+            throw new Error("body-secret");
+          },
+        }),
+        { status: 200 },
+      ),
+  });
+  await assert.rejects(client.createConversation(), (error) => {
+    assert(error instanceof DaykeeperReactNativeTransportError);
+    assert.equal(error.code, "INVALID_RESPONSE");
+    assert.equal(error.outcomeUnknown, true);
+    assert.equal(error.retryable, false);
+    assert(!JSON.stringify(error).includes("body-secret"));
+    return true;
+  });
+});
+
+test("caller abort after dispatch is an unknown non-retryable write outcome", async () => {
+  const controller = new AbortController();
+  const client = createDaykeeperReactNativeClient({
+    baseUrl: "https://support.example.com",
+    getAccessToken: () => "customer-token",
+    fetch: async (_input, init) =>
+      new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener(
+          "abort",
+          () => reject(new Error("aborted")),
+          { once: true },
+        );
+      }),
+  });
+  const pending = client.sendMessage(7, "hello", { signal: controller.signal });
+  setTimeout(() => controller.abort(), 5);
+  await assert.rejects(pending, (error) => {
+    assert(error instanceof DaykeeperReactNativeTransportError);
+    assert.equal(error.code, "REQUEST_ABORTED");
+    assert.equal(error.outcomeUnknown, true);
+    assert.equal(error.retryable, false);
+    return true;
+  });
+});
+
+test("read stream failures do not expose untrusted error text", async () => {
+  const client = createDaykeeperReactNativeClient({
+    baseUrl: "https://support.example.com",
+    getAccessToken: () => "customer-token",
+    fetch: async () =>
+      new Response(
+        new ReadableStream({
+          pull() {
+            throw new Error("private-read-stream-detail");
+          },
+        }),
+      ),
+  });
+  await assert.rejects(client.getUnread(), (error) => {
+    assert(error instanceof DaykeeperReactNativeTransportError);
+    assert.equal(error.code, "INVALID_RESPONSE");
+    assert.equal(error.outcomeUnknown, false);
+    assert(!JSON.stringify(error).includes("private-read-stream-detail"));
+    return true;
+  });
+});
+
+test("a dispatched write timeout does not authorize replay", async () => {
+  let requests = 0;
+  const client = createDaykeeperReactNativeClient({
+    baseUrl: "https://support.example.com",
+    timeoutMs: 1_000,
+    getAccessToken: () => "customer-token",
+    fetch: async (_input, init) => {
+      requests++;
+      return new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener(
+          "abort",
+          () => reject(new Error("timeout")),
+          { once: true },
+        );
+      });
+    },
+  });
+  await assert.rejects(client.createConversation(), (error) => {
+    assert(error instanceof DaykeeperReactNativeTransportError);
+    assert.equal(error.code, "REQUEST_TIMEOUT");
+    assert.equal(error.outcomeUnknown, true);
+    assert.equal(error.retryable, false);
+    return true;
+  });
+  assert.equal(requests, 1);
+});
+
+test("timeout while acquiring a token never dispatches a write", async () => {
+  let requests = 0;
+  const client = createDaykeeperReactNativeClient({
+    baseUrl: "https://support.example.com",
+    timeoutMs: 1_000,
+    getAccessToken: async () => {
+      await new Promise((resolve) => setTimeout(resolve, 1_100));
+      return "late-token";
+    },
+    fetch: async () => {
+      requests++;
+      return Response.json({ conversation: {} }, { status: 201 });
+    },
+  });
+  await assert.rejects(client.createConversation(), (error) => {
+    assert(error instanceof DaykeeperReactNativeTransportError);
+    assert.equal(error.code, "REQUEST_TIMEOUT");
+    assert.equal(error.outcomeUnknown, false);
+    return true;
+  });
+  assert.equal(requests, 0);
+});
+
 test("untrusted API error strings are reduced to a stable fallback", async () => {
   const client = createDaykeeperReactNativeClient({
     baseUrl: "https://support.example.com",
