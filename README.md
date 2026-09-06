@@ -10,6 +10,15 @@ Push notifications, attachments, deep links, and native UI can be added here
 without coupling consuming applications to Daykeeper's private platform or to
 Chatwoot.
 
+API-only inbox gateways support customer conversations, messages, unread state,
+and seen markers. They do not provide widget identity or anonymous-conversation
+claim operations: those calls return `409` with `widget_unavailable` before the
+conversation provider is contacted. Use a widget-enabled gateway for those
+operations.
+
+SDK errors preserve known gateway codes. Unknown remote codes are returned as
+`daykeeper_request_failed`; arbitrary response text is not exposed through errors.
+
 ## Install
 
 ```sh

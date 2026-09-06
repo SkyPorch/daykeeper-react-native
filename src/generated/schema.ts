@@ -11,7 +11,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get widget-safe customer identity */
+        /**
+         * Get widget-safe customer identity
+         * @description API-only inbox gateways authenticate the customer token and return `409`
+         *     `{ "error": "widget_unavailable" }` before calling the conversation
+         *     provider. Use a widget-enabled tenant gateway for this operation.
+         */
         get: operations["getCustomerIdentity"];
         put?: never;
         post?: never;
@@ -114,6 +119,10 @@ export interface paths {
          * Claim a signed-out widget conversation after sign-in
          * @description The widget token proves possession of the anonymous thread. The gateway
          *     refuses identified, foreign-tenant, or email-mismatched contacts.
+         *
+         *     API-only inbox gateways authenticate the token and return `409`
+         *     `{ "error": "widget_unavailable" }` before calling the conversation
+         *     provider. Use a widget-enabled tenant gateway for this operation.
          */
         post: operations["claimAnonymousConversation"];
         delete?: never;
@@ -192,7 +201,7 @@ export interface components {
             status: "open" | "pending" | "resolved" | "snoozed";
             createdAt: number | string | null;
             updatedAt: number | string | null;
-            /** @description Chatwoot agent-side unread count; do not use for a customer badge. */
+            /** @description Agent-side unread count reported by the conversation provider; do not use for a customer badge. */
             unreadCount: number;
             /** @description Customer-side unread count used for product badges. */
             unreadForContact: number;
@@ -306,12 +315,38 @@ export interface components {
             [key: string]: unknown;
         };
         CustomerError: {
+            /** @description Stable error code. Codes are extensible; handle unknown values safely. */
             error: string;
+            /** @description Optional customer-safe explanation, never infrastructure diagnostics. */
+            message?: string;
+            /**
+             * @description Optional server retry advice. False means do not automatically replay
+             *     this request, including a 429 usage ceiling. Absence preserves older
+             *     status-based handling. True does not guarantee a write is idempotent.
+             */
+            retryable?: boolean;
+            /**
+             * @description Optional next step. Known values are review_usage, review_setup and
+             *     refresh_conversation. Values are extensible and grant no authority
+             *     to change billing, budgets or account configuration.
+             */
+            nextAction?: string;
+        } & {
+            [key: string]: unknown;
         };
     };
     responses: {
         /** @description Stable customer-safe error. Upstream provider text is never returned. */
         Error: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["CustomerError"];
+            };
+        };
+        /** @description API-only inbox gateways do not support widget identity or anonymous-conversation claims. */
+        WidgetUnavailable: {
             headers: {
                 [name: string]: unknown;
             };
@@ -348,6 +383,7 @@ export interface operations {
                 };
             };
             401: components["responses"]["Error"];
+            409: components["responses"]["WidgetUnavailable"];
             default: components["responses"]["Error"];
         };
     };
@@ -519,6 +555,7 @@ export interface operations {
                 };
             };
             401: components["responses"]["Error"];
+            409: components["responses"]["WidgetUnavailable"];
             default: components["responses"]["Error"];
         };
     };

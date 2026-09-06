@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Document API-only inbox support and the `widget_unavailable` response for
+  widget-specific identity and anonymous-claim operations.
+- Preserve known gateway error codes while reducing unknown remote values to
+  `daykeeper_request_failed`, preventing arbitrary response text from leaking
+  through SDK errors.
+
 ## 0.1.0
 
 - Add typed customer identity, conversation, message, unread, and seen APIs.
