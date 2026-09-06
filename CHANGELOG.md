@@ -20,5 +20,5 @@
   `Response.text()` behavior with bounded UTF-8 response validation.
 - Add explicit React Native package exports, rotating tokens, request timeouts,
   and stable customer-safe errors.
-- Preserve reverse-proxy path prefixes and retry exactly once with a forced
-  token refresh after an HTTP 401 response.
+- Preserve reverse-proxy path prefixes and retry reads exactly once with a
+  forced token refresh after an HTTP 401 response.

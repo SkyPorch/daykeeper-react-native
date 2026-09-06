@@ -50,9 +50,9 @@ SDK attempt and are never refreshed and replayed. Keep customer tokens in
 memory where possible. Never place them in URLs, analytics, crash reports, or
 application logs.
 
-The request timeout cannot forcibly stop a token provider that never resolves;
-implement providers with their own bounded backend operation so a late token is
-not produced after the caller has abandoned the request.
+The request timeout cannot forcibly cancel a token provider that never resolves,
+but it does settle the SDK request and ignores any late token. Implement
+providers with their own bounded backend operation to avoid wasted work.
 
 ## API
 
