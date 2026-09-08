@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Preserve provider-neutral wording in the generated customer contract.
 - Document API-only inbox support and the `widget_unavailable` response for
   widget-specific identity and anonymous-claim operations.
 - Preserve known gateway error codes while reducing unknown remote values to
