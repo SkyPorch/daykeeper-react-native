@@ -29,7 +29,7 @@
   ],
   "scripts": {
     "build": "tsup src/index.ts --format esm,cjs --dts --sourcemap --target es2020 --clean",
-    "check": "pnpm format:check && pnpm check:generated && pnpm typecheck && pnpm test && pnpm build && pnpm verify:exports && pnpm smoke:metro && pnpm pack:check",
+    "check": "pnpm format:check && pnpm check:generated && pnpm typecheck && pnpm test && pnpm test:hermes-harness && pnpm build && pnpm verify:exports && pnpm smoke:metro && pnpm pack:check",
     "check:generated": "pnpm generate && git diff --exit-code -- src/generated/schema.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -37,6 +37,7 @@
     "pack:check": "npm pack --dry-run --json",
     "smoke:metro": "react-native bundle --platform ios --dev false --entry-file smoke/index.js --bundle-output .smoke/ios.jsbundle && react-native bundle --platform android --dev false --entry-file smoke/index.js --bundle-output .smoke/android.jsbundle",
     "test": "tsx --test \"test/**/*.test.ts\"",
+    "test:hermes-harness": "node --test verification/hermes/safety.test.mjs && tsx --test verification/hermes/android/fixture.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "verify:exports": "node scripts/verify-exports.mjs",
     "prepublishOnly": "node scripts/verify-release.mjs",
