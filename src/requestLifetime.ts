@@ -72,6 +72,13 @@ export function createRequestLifetime(timeoutMs: number, caller?: AbortSignal) {
             },
             (error: unknown) => {
               if (settled) return;
+              try {
+                checkDeadline();
+              } catch (deadlineError) {
+                finish();
+                reject(deadlineError);
+                return;
+              }
               finish();
               reject(error);
             },
