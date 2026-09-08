@@ -106,6 +106,18 @@ command("bundle", ["install"], {
   stdio: "inherit",
   timeout: 300_000,
 });
+command(
+  "bundle",
+  [
+    "exec",
+    "ruby",
+    path.join(root, "verification/hermes/ios/create-uitest.test.rb"),
+  ],
+  {
+    cwd: app,
+    stdio: "inherit",
+  },
+);
 command("bundle", ["exec", "pod", "install"], {
   cwd: path.join(app, "ios"),
   stdio: "inherit",

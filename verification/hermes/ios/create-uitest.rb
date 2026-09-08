@@ -17,6 +17,7 @@ file = project.main_group.new_file(source_path)
 target.add_file_references([file]) unless target.source_build_phase.files_references.include?(file)
 target.build_configurations.each do |configuration|
   settings = configuration.build_settings
+  settings["PRODUCT_NAME"] = "$(TARGET_NAME)"
   settings["PRODUCT_BUNDLE_IDENTIFIER"] = "com.daykeeperhermessmoke.uitests"
   settings["GENERATE_INFOPLIST_FILE"] = "YES"
   settings["SWIFT_VERSION"] = "5.0"
