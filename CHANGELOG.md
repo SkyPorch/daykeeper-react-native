@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.1
 
 - Make writes single-dispatch, honor explicit read retry vetoes, and mark
   dispatched write transport or ambiguous server failures as `outcomeUnknown`
