@@ -213,6 +213,7 @@ export class DaykeeperReactNativeClient {
         new DaykeeperReactNativeTransportError({
           code: "REQUEST_TIMEOUT",
           message: `The Daykeeper request exceeded ${this.#timeoutMs}ms`,
+          retryable: true,
         }),
       );
     }, this.#timeoutMs);
