@@ -76,7 +76,7 @@
     "react": "19.2.3",
     "react-native": "0.86.2",
     "tsup": "8.5.1",
-    "tsx": "4.23.12",
+    "tsx": "4.23.13",
     "typescript": "5.9.3"
   },
   "keywords": [
