@@ -2,7 +2,10 @@
 
 ## Unreleased
 
-- Preserve provider-neutral wording in the generated customer contract.
+- Make writes single-dispatch, honor explicit read retry vetoes, and mark
+  dispatched write transport or ambiguous server failures as `outcomeUnknown`
+  without claiming non-delivery.
+
 - Document API-only inbox support and the `widget_unavailable` response for
   widget-specific identity and anonymous-claim operations.
 - Preserve known gateway error codes while reducing unknown remote values to

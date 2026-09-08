@@ -10,13 +10,20 @@ export class DaykeeperReactNativeApiError extends Error {
   readonly status: number;
   readonly code: string;
   readonly retryable: boolean;
+  readonly outcomeUnknown: boolean;
 
-  constructor(options: { status: number; code: string; retryable: boolean }) {
+  constructor(options: {
+    status: number;
+    code: string;
+    retryable: boolean;
+    outcomeUnknown?: boolean;
+  }) {
     super(options.code);
     this.name = "DaykeeperReactNativeApiError";
     this.status = options.status;
     this.code = options.code;
-    this.retryable = options.retryable;
+    this.outcomeUnknown = options.outcomeUnknown ?? false;
+    this.retryable = !this.outcomeUnknown && options.retryable;
   }
 
   toJSON(): {
@@ -24,12 +31,14 @@ export class DaykeeperReactNativeApiError extends Error {
     status: number;
     code: string;
     retryable: boolean;
+    outcomeUnknown: boolean;
   } {
     return {
       name: this.name,
       status: this.status,
       code: this.code,
       retryable: this.retryable,
+      outcomeUnknown: this.outcomeUnknown,
     };
   }
 }
@@ -37,16 +46,19 @@ export class DaykeeperReactNativeApiError extends Error {
 export class DaykeeperReactNativeTransportError extends Error {
   readonly code: DaykeeperReactNativeTransportErrorCode;
   readonly retryable: boolean;
+  readonly outcomeUnknown: boolean;
 
   constructor(options: {
     code: DaykeeperReactNativeTransportErrorCode;
     message: string;
     retryable?: boolean;
+    outcomeUnknown?: boolean;
   }) {
     super(options.message);
     this.name = "DaykeeperReactNativeTransportError";
     this.code = options.code;
-    this.retryable = options.retryable ?? false;
+    this.outcomeUnknown = options.outcomeUnknown ?? false;
+    this.retryable = !this.outcomeUnknown && (options.retryable ?? false);
   }
 
   toJSON(): {
@@ -54,12 +66,14 @@ export class DaykeeperReactNativeTransportError extends Error {
     code: DaykeeperReactNativeTransportErrorCode;
     message: string;
     retryable: boolean;
+    outcomeUnknown: boolean;
   } {
     return {
       name: this.name,
       code: this.code,
       message: this.message,
       retryable: this.retryable,
+      outcomeUnknown: this.outcomeUnknown,
     };
   }
 }
