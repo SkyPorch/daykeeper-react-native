@@ -3,16 +3,37 @@ export function validateHost(env, args) {
     throw new Error("explicit --execute PACK_JSON required");
   if (
     env.GITHUB_ACTIONS !== "true" ||
-    env.RUNNER_OS !== "Linux" ||
     env.RUNNER_ENVIRONMENT !== "github-hosted"
   )
-    throw new Error("disposable GitHub-hosted Linux runner required");
+    throw new Error("disposable GitHub-hosted runner required");
+  if (env.RUNNER_OS !== "Linux")
+    throw new Error("Linux runner required for Android smoke");
   if (
     !/^emulator-\d+$/.test(env.ANDROID_SERIAL ?? "") ||
     env.ANDROID_SERIAL !== `emulator-${env.EMULATOR_PORT}`
   )
     throw new Error("explicit owned emulator serial required");
   return env.ANDROID_SERIAL;
+}
+
+export function validateIosHost(env, args) {
+  if (args.length !== 2 || args[0] !== "--execute" || !args[1])
+    throw new Error("explicit --execute PACK_JSON required");
+  if (
+    env.GITHUB_ACTIONS !== "true" ||
+    env.RUNNER_OS !== "macOS" ||
+    env.RUNNER_ENVIRONMENT !== "github-hosted"
+  )
+    throw new Error("disposable GitHub-hosted macOS runner required");
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      env.SIMULATOR_UDID ?? "",
+    )
+  )
+    throw new Error("explicit owned simulator UDID required");
+  if (!/^DaykeeperHermesSmoke-\d+-\d+$/.test(env.SIMULATOR_NAME ?? ""))
+    throw new Error("explicit owned simulator name required");
+  return { udid: env.SIMULATOR_UDID, name: env.SIMULATOR_NAME };
 }
 
 export async function waitForMarker(
