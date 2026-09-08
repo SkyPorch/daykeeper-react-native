@@ -23,6 +23,40 @@ const MAX_RESPONSE_BYTES = 1024 * 1024;
 const MAX_TOKEN_LENGTH = 16_384;
 const MAX_MESSAGE_LENGTH = 16_000;
 
+// Gateway response bodies are untrusted. Only documented stable codes may
+// cross the SDK boundary; arbitrary strings can contain secrets or internals.
+const SAFE_API_CODES = new Set([
+  "missing_bearer_token",
+  "invalid_bearer_token",
+  "invalid_token",
+  "unsupported_token",
+  "invalid_signature",
+  "invalid_tenant",
+  "unknown_tenant",
+  "invalid_issuer",
+  "invalid_audience",
+  "invalid_subject",
+  "invalid_expiration",
+  "expired_token",
+  "token_lifetime_too_long",
+  "insufficient_scope",
+  "erasure_targets_do_not_match_token",
+  "unknown_campaign",
+  "widget_token_required",
+  "not_found",
+  "support_gateway_request_failed",
+  "conversation_not_found",
+  "rate_limited",
+  "support_upstream_rejected",
+  "support_upstream_unavailable",
+  "widget_unavailable",
+  "daykeeper_usage_limit_exceeded",
+  "daykeeper_usage_not_enabled",
+  "daykeeper_support_not_ready",
+  "daykeeper_resource_conflict",
+  "daykeeper_support_unavailable",
+]);
+
 export interface DaykeeperReactNativeTokenProviderContext {
   /**
    * True only after Daykeeper rejected the first token with HTTP 401. The
@@ -207,7 +241,9 @@ export class DaykeeperReactNativeClient {
         const payload = await readJson(response, lifetime);
         if (!response.ok) {
           const code =
-            isRecord(payload) && typeof payload.error === "string"
+            isRecord(payload) &&
+            typeof payload.error === "string" &&
+            SAFE_API_CODES.has(payload.error)
               ? payload.error
               : "daykeeper_request_failed";
           throw new DaykeeperReactNativeApiError({

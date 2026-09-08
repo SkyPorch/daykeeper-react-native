@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Document API-only inbox support and the `widget_unavailable` response for
+  widget-specific identity and anonymous-claim operations.
+
 ## 0.1.1
 
 - Classify credential-provider failures as non-retryable `TOKEN_PROVIDER_ERROR`

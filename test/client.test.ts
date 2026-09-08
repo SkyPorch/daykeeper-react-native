@@ -57,6 +57,45 @@ test("exposes stable gateway errors without including the token", async () => {
   assert.deepEqual(refreshRequests, [false, true]);
 });
 
+test("API-only widget operations surface 409 without retrying or exposing arbitrary error text", async () => {
+  let requests = 0;
+  const client = createDaykeeperReactNativeClient({
+    baseUrl: "https://support.example.com",
+    getAccessToken: () => "customer-token",
+    fetch: async () => {
+      requests++;
+      return Response.json({ error: "widget_unavailable" }, { status: 409 });
+    },
+  });
+  await assert.rejects(client.getIdentity(), (error) => {
+    assert(error instanceof DaykeeperReactNativeApiError);
+    assert.equal(error.status, 409);
+    assert.equal(error.code, "widget_unavailable");
+    assert.equal(error.retryable, false);
+    return true;
+  });
+  await assert.rejects(client.claimAnonymousConversation("widget-token"), {
+    status: 409,
+    code: "widget_unavailable",
+  });
+  assert.equal(requests, 2);
+});
+
+test("untrusted API error strings are reduced to a stable fallback", async () => {
+  const client = createDaykeeperReactNativeClient({
+    baseUrl: "https://support.example.com",
+    getAccessToken: () => "customer-token",
+    fetch: async () =>
+      Response.json({ error: "sk_live_1234567890" }, { status: 502 }),
+  });
+  await assert.rejects(client.getUnread(), (error) => {
+    assert(error instanceof DaykeeperReactNativeApiError);
+    assert.equal(error.code, "daykeeper_request_failed");
+    assert(!JSON.stringify(error).includes("sk_live_1234567890"));
+    return true;
+  });
+});
+
 test("refreshes once after a stale token is rejected", async () => {
   const refreshRequests: boolean[] = [];
   const authorization: Array<string | null> = [];
