@@ -16,5 +16,6 @@ real networking, iOS React Native runtime, messenger UI, push or attachments.
 emulator or application build. Actual execution refuses local/self-hosted
 runners and requires an explicit emulator serial supplied by the pinned action.
 Every adb operation targets that serial, and pre-existing app installs are refused.
-The workflow runs for changes to its own harness and can also be dispatched
-manually. It is not a publication job or a branch-protection requirement.
+The workflow runs for changes to its harness, SDK source, package metadata,
+lockfile or configuration and can also be dispatched manually. It is not a
+publication job or a branch-protection requirement.

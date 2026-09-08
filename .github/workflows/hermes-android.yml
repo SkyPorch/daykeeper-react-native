@@ -6,6 +6,10 @@ on:
     paths:
       - verification/hermes/**
       - .github/workflows/hermes-android.yml
+      - src/**
+      - package.json
+      - pnpm-lock.yaml
+      - "**config*"
 
 permissions:
   contents: read
@@ -30,8 +34,10 @@ jobs:
       - run: pnpm test:hermes-harness
       - name: Pack exact candidate
         run: |
+          pnpm build
           mkdir "$RUNNER_TEMP/daykeeper-packed"
-          npm pack --json --pack-destination "$RUNNER_TEMP/daykeeper-packed" > "$RUNNER_TEMP/daykeeper-packed/pack.json"
+          npm pack --ignore-scripts --json --pack-destination "$RUNNER_TEMP/daykeeper-packed" > "$RUNNER_TEMP/daykeeper-packed/pack.json"
+          node -e 'JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"))' "$RUNNER_TEMP/daykeeper-packed/pack.json"
       - name: Enable acceleration on disposable runner
         run: |
           test -c /dev/kvm
