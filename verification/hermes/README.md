@@ -1,4 +1,4 @@
-# Android/Hermes runtime verification
+# React Native/Hermes runtime verification
 
 The `React Native Hermes Android smoke` workflow builds a
 temporary React Native 0.86.2 release application with the exact packed SDK.
@@ -8,9 +8,13 @@ responses and React Native's own URL, Headers and Response implementations.
 The app rejects accidental calls to global fetch. No service credentials or
 live provider traffic are used. A receipt records the commit and package/APK hashes.
 
-This is separate from Node tests and Metro bundling. Until the hosted run passes,
-the harness is implementation only, not runtime evidence. It does not prove
-real networking, iOS React Native runtime, messenger UI, push or attachments.
+The `React Native Hermes iOS smoke` workflow provides the corresponding hosted
+macOS iOS Simulator proof. It uses the same packed tarball and fixture, and
+uses a generated XCUITest target to require the unique marker as a rendered
+accessibility label.
+This is separate from Node tests and Metro bundling. Until the hosted run
+passes, the harness is implementation only, not runtime evidence. It does not
+prove real networking, messenger UI, push or attachments.
 
 `pnpm test:hermes-harness` runs local fixture and safety tests without any
 emulator or application build. Actual execution refuses local/self-hosted
