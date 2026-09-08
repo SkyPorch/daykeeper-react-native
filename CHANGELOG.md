@@ -1,9 +1,13 @@
 # Changelog
 
-## 0.1.1
+## Unreleased
 
-- Make public SDK and generated contract documentation
-  infrastructure-provider neutral.
+- Preserve provider-neutral wording in the generated customer contract.
+- Document API-only inbox support and the `widget_unavailable` response for
+  widget-specific identity and anonymous-claim operations.
+- Preserve known gateway error codes while reducing unknown remote values to
+  `daykeeper_request_failed`, preventing arbitrary response text from leaking
+  through SDK errors.
 
 ## 0.1.0
 
