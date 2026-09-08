@@ -188,22 +188,72 @@ export class DaykeeperReactNativeClient {
     } = {},
   ): Promise<ResponseBody> {
     const timeoutController = new AbortController();
-    let timedOut = false;
+    let stopReason: "timeout" | "caller" | undefined;
+    let activeResponse: Response | undefined;
+    const cancelActiveBody = () => {
+      try {
+        void activeResponse?.body?.cancel().catch(() => {});
+      } catch {
+        // Body cleanup is best-effort and must never mask the request outcome.
+      }
+    };
+    let rejectLifetime: (reason: unknown) => void = () => {};
+    const lifetime = new Promise<never>((_, reject) => {
+      rejectLifetime = reject;
+    });
+    // A pre-aborted request may never race this promise; absorb its terminal
+    // rejection so synchronous cancellation cannot create unhandled activity.
+    void lifetime.catch(() => {});
     const timeout = setTimeout(() => {
-      timedOut = true;
+      if (stopReason) return;
+      stopReason = "timeout";
       timeoutController.abort();
+      cancelActiveBody();
+      rejectLifetime(
+        new DaykeeperReactNativeTransportError({
+          code: "REQUEST_TIMEOUT",
+          message: `The Daykeeper request exceeded ${this.#timeoutMs}ms`,
+          retryable: true,
+        }),
+      );
     }, this.#timeoutMs);
-    const onCallerAbort = () => timeoutController.abort();
+    const onCallerAbort = () => {
+      if (stopReason) return;
+      stopReason = "caller";
+      timeoutController.abort();
+      cancelActiveBody();
+      rejectLifetime(
+        new DaykeeperReactNativeTransportError({
+          code: "REQUEST_ABORTED",
+          message: "The Daykeeper request was aborted",
+        }),
+      );
+    };
     const mutating = options.method === "POST";
     let dispatched = false;
-    if (options.signal?.aborted) timeoutController.abort();
+    if (options.signal?.aborted) onCallerAbort();
     else
       options.signal?.addEventListener("abort", onCallerAbort, { once: true });
 
     try {
       for (let attempt = 0; attempt < (mutating ? 1 : 2); attempt += 1) {
+        if (stopReason) {
+          throw new DaykeeperReactNativeTransportError({
+            code:
+              stopReason === "timeout" ? "REQUEST_TIMEOUT" : "REQUEST_ABORTED",
+            message:
+              stopReason === "timeout"
+                ? `The Daykeeper request exceeded ${this.#timeoutMs}ms`
+                : "The Daykeeper request was aborted",
+          });
+        }
         const token = validateToken(
-          await this.#getAccessToken({ forceRefresh: attempt === 1 }),
+          await Promise.race([
+            Promise.resolve().then(() =>
+              this.#getAccessToken({ forceRefresh: attempt === 1 }),
+            ),
+            lifetime,
+          ]),
         );
         const headers = new Headers({
           accept: "application/json",
@@ -215,16 +265,20 @@ export class DaykeeperReactNativeClient {
 
         let response: Response;
         try {
-          if (timedOut || options.signal?.aborted) {
+          if (stopReason || options.signal?.aborted) {
             throw new DaykeeperReactNativeTransportError({
-              code: timedOut ? "REQUEST_TIMEOUT" : "REQUEST_ABORTED",
-              message: timedOut
-                ? `The Daykeeper request exceeded ${this.#timeoutMs}ms`
-                : "The Daykeeper request was aborted",
+              code:
+                stopReason === "timeout"
+                  ? "REQUEST_TIMEOUT"
+                  : "REQUEST_ABORTED",
+              message:
+                stopReason === "timeout"
+                  ? `The Daykeeper request exceeded ${this.#timeoutMs}ms`
+                  : "The Daykeeper request was aborted",
             });
           }
           dispatched = true;
-          response = await this.#fetch(`${this.#baseUrl}${path}`, {
+          const fetchPromise = this.#fetch(`${this.#baseUrl}${path}`, {
             method: options.method ?? "GET",
             body:
               options.body === undefined
@@ -232,9 +286,20 @@ export class DaykeeperReactNativeClient {
                 : JSON.stringify(options.body),
             headers,
             signal: timeoutController.signal,
+          }).then((result) => {
+            if (stopReason) {
+              try {
+                void result.body?.cancel().catch(() => {});
+              } catch {
+                // Late body cleanup is best-effort.
+              }
+            }
+            return result;
           });
+          response = await Promise.race([fetchPromise, lifetime]);
+          activeResponse = response;
         } catch {
-          if (timedOut) {
+          if (stopReason === "timeout") {
             throw new DaykeeperReactNativeTransportError({
               code: "REQUEST_TIMEOUT",
               message: `The Daykeeper request exceeded ${this.#timeoutMs}ms`,
@@ -259,10 +324,13 @@ export class DaykeeperReactNativeClient {
 
         let payload: unknown;
         try {
-          payload = await readJson(response);
+          payload = await Promise.race([
+            readJson(response, timeoutController.signal),
+            lifetime,
+          ]);
         } catch (error) {
           if (mutating && dispatched) {
-            if (timedOut) {
+            if (stopReason === "timeout") {
               throw new DaykeeperReactNativeTransportError({
                 code: "REQUEST_TIMEOUT",
                 message: `The Daykeeper request exceeded ${this.#timeoutMs}ms`,
@@ -411,7 +479,10 @@ function validateMessage(value: string): string {
   return normalized;
 }
 
-async function readJson(response: Response): Promise<unknown> {
+async function readJson(
+  response: Response,
+  signal?: AbortSignal,
+): Promise<unknown> {
   const declaredLength = Number(response.headers.get("content-length"));
   if (Number.isFinite(declaredLength) && declaredLength > MAX_RESPONSE_BYTES) {
     throw responseTooLarge();
@@ -423,7 +494,7 @@ async function readJson(response: Response): Promise<unknown> {
     typeof body.getReader === "function" &&
     typeof TextDecoder === "function"
   ) {
-    return parseJson(await readStream(body));
+    return parseJson(await readStream(body, signal));
   }
 
   let text: string;
@@ -438,23 +509,43 @@ async function readJson(response: Response): Promise<unknown> {
   return parseJson(text);
 }
 
-async function readStream(body: ReadableStream<Uint8Array>): Promise<string> {
+async function readStream(
+  body: ReadableStream<Uint8Array>,
+  signal?: AbortSignal,
+): Promise<string> {
   const reader = body.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
+  let cancelled = false;
+  const cancel = () => {
+    if (cancelled) return;
+    cancelled = true;
+    try {
+      void Promise.resolve(reader.cancel()).catch(() => {});
+    } catch {
+      // Cleanup must not replace the bounded, sanitized request error.
+    }
+  };
+  if (signal?.aborted) cancel();
+  else signal?.addEventListener("abort", cancel, { once: true });
   try {
     for (;;) {
       const { done, value } = await reader.read();
       if (done) break;
       total += value.byteLength;
       if (total > MAX_RESPONSE_BYTES) {
-        await reader.cancel();
+        cancel();
         throw responseTooLarge();
       }
       chunks.push(value);
     }
   } finally {
-    reader.releaseLock();
+    signal?.removeEventListener("abort", cancel);
+    try {
+      reader.releaseLock();
+    } catch {
+      // Cleanup must not replace the bounded, sanitized request error.
+    }
   }
 
   const bytes = new Uint8Array(total);

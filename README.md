@@ -8,16 +8,7 @@ This package contains no native module and no embedded support UI. It provides
 typed identity, conversation, message, unread, seen, and anonymous-claim APIs.
 Push notifications, attachments, deep links, and native UI can be added here
 without coupling consuming applications to Daykeeper's private platform or to
-any infrastructure provider.
-
-API-only inbox gateways support customer conversations, messages, unread state,
-and seen markers. They do not provide widget identity or anonymous-conversation
-claim operations: those calls return `409` with `widget_unavailable` before the
-conversation provider is contacted. Use a widget-enabled gateway for those
-operations.
-
-SDK errors preserve known gateway codes. Unknown remote codes are returned as
-`daykeeper_request_failed`; arbitrary response text is not exposed through errors.
+Chatwoot.
 
 API-only inbox gateways support customer conversations, messages, unread state,
 and seen markers. They do not provide widget identity or anonymous-conversation
@@ -59,9 +50,9 @@ SDK attempt and are never refreshed and replayed. Keep customer tokens in
 memory where possible. Never place them in URLs, analytics, crash reports, or
 application logs.
 
-The request timeout cannot forcibly stop a token provider that never resolves;
-implement providers with their own bounded backend operation so a late token is
-not produced after the caller has abandoned the request.
+The request timeout cannot forcibly cancel a token provider that never resolves,
+but it does settle the SDK request and ignores any late token. Implement
+providers with their own bounded backend operation to avoid wasted work.
 
 ## API
 
@@ -82,6 +73,6 @@ where appropriate.
 
 ## Release status
 
-Version `0.1.1` is generated from the customer contract recorded in
+Version `0.1.0` is generated from the customer contract recorded in
 [`openapi/SOURCE.md`](openapi/SOURCE.md). Releases use the protected,
 provenance-producing process in [`RELEASING.md`](RELEASING.md).
