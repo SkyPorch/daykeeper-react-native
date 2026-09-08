@@ -8,7 +8,7 @@ This package contains no native module and no embedded support UI. It provides
 typed identity, conversation, message, unread, seen, and anonymous-claim APIs.
 Push notifications, attachments, deep links, and native UI can be added here
 without coupling consuming applications to Daykeeper's private platform or to
-Chatwoot.
+any infrastructure provider.
 
 ## Install
 
@@ -53,6 +53,6 @@ and release certification matrix.
 
 ## Release status
 
-Version `0.1.0` is generated from the customer contract recorded in
+Version `0.1.1` is generated from the customer contract recorded in
 [`openapi/SOURCE.md`](openapi/SOURCE.md). Releases use the protected,
 provenance-producing process in [`RELEASING.md`](RELEASING.md).
