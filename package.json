@@ -31,7 +31,7 @@
   ],
   "scripts": {
     "build": "tsup src/index.ts src/native.ts --format esm,cjs --dts --sourcemap --target es2020 --clean",
-    "check": "pnpm format:check && pnpm check:generated && pnpm typecheck && pnpm test && pnpm build && pnpm verify:exports && pnpm smoke:package && pnpm smoke:metro && pnpm pack:check",
+    "check": "pnpm format:check && pnpm check:generated && pnpm typecheck && pnpm test && pnpm test:hermes-harness && pnpm build && pnpm verify:exports && pnpm smoke:package && pnpm smoke:metro && pnpm pack:check",
     "check:generated": "node scripts/check-generated.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -43,7 +43,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "verify:exports": "node scripts/verify-exports.mjs",
     "prepublishOnly": "node scripts/verify-release.mjs",
-    "prepack": "pnpm run build"
+    "prepack": "pnpm run build",
+    "test:hermes-harness": "node --test verification/hermes/safety.test.mjs && tsx --test verification/hermes/android/fixture.test.ts"
   },
   "packageManager": "pnpm@10.8.0",
   "engines": {
