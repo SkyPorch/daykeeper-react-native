@@ -52,8 +52,11 @@ Follow these steps in this order. Do not start a release out of order.
 
 Before step 5, run `release.yml` from the Actions tab with `dry_run` left at
 `true`. That path runs the full check chain and `npm publish --dry-run
---provenance`, and cannot publish or stage. The ancestor gate is skipped there
-because a manual run has no release tag.
+--provenance=false` in a separate job with no production environment or OIDC
+permission. It checks packaging, not provenance or publishing authorization.
+Manual runs may select a branch or commit, so the release-tag/version assertion
+applies only to release events. The staging job checks out the exact commit
+whose ancestry was verified.
 
 ## Published 0.1.0 has no provenance
 

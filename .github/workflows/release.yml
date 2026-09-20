@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: Run the full release path but stop at npm publish --dry-run
+        description: Check and package without publishing credentials or provenance
         type: boolean
         default: true
       ref:
@@ -18,8 +18,41 @@ permissions:
   contents: read
 
 jobs:
+  dry-run:
+    if: github.event_name == 'workflow_dispatch' && inputs.dry_run
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Deliberately no production environment or OIDC permission: checked-out
+    # code and install scripts can run, but cannot obtain publishing credentials.
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10.8.0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          cache: pnpm
+      - run: npm install --global npm@11.15.0
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - run: npm publish --dry-run --provenance=false --access public
+  refuse-manual-publish:
+    if: github.event_name == 'workflow_dispatch' && !inputs.dry_run
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - run: |
+          echo "::error::Manual runs only support dry runs; publish a GitHub release to stage a package." >&2
+          exit 1
   stage:
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.release.tag_name, 'v')
+    if: github.event_name == 'release' && startsWith(github.event.release.tag_name, 'v')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: daykeeper-npm-production
@@ -32,7 +65,6 @@ jobs:
       # unreviewed branch or to no branch at all. Prove the tag is on main
       # before any repository code is checked out or executed.
       - name: Check out main for tag verification
-        if: github.event_name == 'release'
         uses: actions/checkout@v7
         with:
           ref: main
@@ -40,7 +72,7 @@ jobs:
           # Credentials are kept only so the verification step below can fetch
           # the tag ref; they are dropped again for the tag checkout.
       - name: Verify the release tag is an ancestor of main
-        if: github.event_name == 'release'
+        id: verified
         env:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
           TARGET_COMMITISH: ${{ github.event.release.target_commitish }}
@@ -48,6 +80,10 @@ jobs:
           set -euo pipefail
           if [ "${TARGET_COMMITISH}" != "main" ]; then
             echo "::error::Release targets '${TARGET_COMMITISH}', not main." >&2
+            exit 1
+          fi
+          if [[ ! "${RELEASE_TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Invalid release tag." >&2
             exit 1
           fi
           git fetch --no-tags --prune origin \
@@ -62,9 +98,10 @@ jobs:
             echo "::error::Tag ${RELEASE_TAG} (${tag_sha}) is not an ancestor of origin/main; refusing to publish." >&2
             exit 1
           fi
+          echo "sha=${tag_sha}" >> "${GITHUB_OUTPUT}"
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.ref || github.ref }}
+          ref: ${{ steps.verified.outputs.sha }}
           persist-credentials: false
       - uses: pnpm/action-setup@v6
         with:
@@ -78,18 +115,5 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
       - run: node scripts/verify-release.mjs
-      # The dry run exercises everything a real release does, including
-      # provenance assembly, but never uploads or stages a tarball.
-      - name: Dry-run publish (no upload, no staging)
-        if: github.event_name == 'workflow_dispatch' && inputs.dry_run
-        run: npm publish --dry-run --provenance --access public
-      # Manual runs can never publish or stage. Only a published GitHub release
-      # on an ancestor-verified tag reaches the staging step below.
-      - name: Refuse a non-dry manual run
-        if: github.event_name == 'workflow_dispatch' && !inputs.dry_run
-        run: |
-          echo "::error::workflow_dispatch never publishes; publish a GitHub release instead." >&2
-          exit 1
       - name: Stage package for npm review
-        if: github.event_name == 'release'
         run: npm stage publish --access public --provenance --tag "${{ github.event.release.prerelease && 'next' || 'latest' }}"
