@@ -2,6 +2,11 @@ import {
   DaykeeperReactNativeApiError,
   DaykeeperReactNativeTransportError,
 } from "./errors.js";
+import {
+  createRequestLifetime,
+  discardResponse,
+  discardReader,
+} from "./requestLifetime.js";
 import type {
   DaykeeperClaimConversationResult,
   DaykeeperConversationList,
@@ -18,46 +23,15 @@ const MAX_RESPONSE_BYTES = 1024 * 1024;
 const MAX_TOKEN_LENGTH = 16_384;
 const MAX_MESSAGE_LENGTH = 16_000;
 
-// Gateway response bodies are untrusted. Only documented stable codes may
-// cross the SDK boundary; arbitrary strings can contain secrets or internals.
-const SAFE_API_CODES = new Set([
-  "missing_bearer_token",
-  "invalid_bearer_token",
-  "invalid_token",
-  "unsupported_token",
-  "invalid_signature",
-  "invalid_tenant",
-  "unknown_tenant",
-  "invalid_issuer",
-  "invalid_audience",
-  "invalid_subject",
-  "invalid_expiration",
-  "expired_token",
-  "token_lifetime_too_long",
-  "insufficient_scope",
-  "erasure_targets_do_not_match_token",
-  "unknown_campaign",
-  "widget_token_required",
-  "not_found",
-  "support_gateway_request_failed",
-  "conversation_not_found",
-  "rate_limited",
-  "support_upstream_rejected",
-  "support_upstream_unavailable",
-  "widget_unavailable",
-  "daykeeper_usage_limit_exceeded",
-  "daykeeper_usage_not_enabled",
-  "daykeeper_support_not_ready",
-  "daykeeper_resource_conflict",
-  "daykeeper_support_unavailable",
-]);
-
 export interface DaykeeperReactNativeTokenProviderContext {
   /**
-   * True only after Daykeeper rejected the first token with HTTP 401. The
+   * True only after a GET rejected the first token with HTTP 401 and did not
+   * explicitly forbid replay with retryable: false. The
    * provider should bypass any token cache and exchange the app session again.
    */
   forceRefresh: boolean;
+  /** Cancel credential exchange when the request is aborted or expires. */
+  signal?: AbortSignal;
 }
 
 export type DaykeeperReactNativeTokenProvider = (
@@ -67,6 +41,7 @@ export type DaykeeperReactNativeTokenProvider = (
 export interface DaykeeperReactNativeClientOptions {
   baseUrl: string;
   getAccessToken: DaykeeperReactNativeTokenProvider;
+  /** Must reject redirects, omit ambient cookies, and honor cache policy. */
   fetch?: typeof globalThis.fetch;
   timeoutMs?: number;
 }
@@ -187,73 +162,22 @@ export class DaykeeperReactNativeClient {
       signal?: AbortSignal;
     } = {},
   ): Promise<ResponseBody> {
-    const timeoutController = new AbortController();
-    let stopReason: "timeout" | "caller" | undefined;
-    let activeResponse: Response | undefined;
-    const cancelActiveBody = () => {
-      try {
-        void activeResponse?.body?.cancel().catch(() => {});
-      } catch {
-        // Body cleanup is best-effort and must never mask the request outcome.
-      }
-    };
-    let rejectLifetime: (reason: unknown) => void = () => {};
-    const lifetime = new Promise<never>((_, reject) => {
-      rejectLifetime = reject;
-    });
-    // A pre-aborted request may never race this promise; absorb its terminal
-    // rejection so synchronous cancellation cannot create unhandled activity.
-    void lifetime.catch(() => {});
-    const timeout = setTimeout(() => {
-      if (stopReason) return;
-      stopReason = "timeout";
-      timeoutController.abort();
-      cancelActiveBody();
-      rejectLifetime(
-        new DaykeeperReactNativeTransportError({
-          code: "REQUEST_TIMEOUT",
-          message: `The Daykeeper request exceeded ${this.#timeoutMs}ms`,
-          retryable: true,
-        }),
-      );
-    }, this.#timeoutMs);
-    const onCallerAbort = () => {
-      if (stopReason) return;
-      stopReason = "caller";
-      timeoutController.abort();
-      cancelActiveBody();
-      rejectLifetime(
-        new DaykeeperReactNativeTransportError({
-          code: "REQUEST_ABORTED",
-          message: "The Daykeeper request was aborted",
-        }),
-      );
-    };
-    const mutating = options.method === "POST";
+    const lifetime = createRequestLifetime(this.#timeoutMs, options.signal);
+    const method = options.method ?? "GET";
+    const mutating = method !== "GET";
+    const attempts = mutating ? 1 : 2;
     let dispatched = false;
-    if (options.signal?.aborted) onCallerAbort();
-    else
-      options.signal?.addEventListener("abort", onCallerAbort, { once: true });
+    let response: Response | undefined;
 
     try {
-      for (let attempt = 0; attempt < (mutating ? 1 : 2); attempt += 1) {
-        if (stopReason) {
-          throw new DaykeeperReactNativeTransportError({
-            code:
-              stopReason === "timeout" ? "REQUEST_TIMEOUT" : "REQUEST_ABORTED",
-            message:
-              stopReason === "timeout"
-                ? `The Daykeeper request exceeded ${this.#timeoutMs}ms`
-                : "The Daykeeper request was aborted",
-          });
-        }
+      for (let attempt = 0; attempt < attempts; attempt += 1) {
         const token = validateToken(
-          await Promise.race([
-            Promise.resolve().then(() =>
-              this.#getAccessToken({ forceRefresh: attempt === 1 }),
-            ),
-            lifetime,
-          ]),
+          await lifetime.run(() =>
+            resolveToken(this.#getAccessToken, {
+              forceRefresh: attempt === 1,
+              signal: lifetime.signal,
+            }),
+          ),
         );
         const headers = new Headers({
           accept: "application/json",
@@ -263,127 +187,69 @@ export class DaykeeperReactNativeClient {
           headers.set("content-type", "application/json");
         }
 
-        let response: Response;
         try {
-          if (stopReason || options.signal?.aborted) {
-            throw new DaykeeperReactNativeTransportError({
-              code:
-                stopReason === "timeout"
-                  ? "REQUEST_TIMEOUT"
-                  : "REQUEST_ABORTED",
-              message:
-                stopReason === "timeout"
-                  ? `The Daykeeper request exceeded ${this.#timeoutMs}ms`
-                  : "The Daykeeper request was aborted",
+          response = await lifetime.run(() => {
+            dispatched = true;
+            return this.#fetch(`${this.#baseUrl}${path}`, {
+              method,
+              body:
+                options.body === undefined
+                  ? undefined
+                  : JSON.stringify(options.body),
+              headers,
+              signal: lifetime.signal,
+              redirect: "error",
+              credentials: "omit",
+              cache: "no-store",
             });
-          }
-          dispatched = true;
-          const fetchPromise = this.#fetch(`${this.#baseUrl}${path}`, {
-            method: options.method ?? "GET",
-            body:
-              options.body === undefined
-                ? undefined
-                : JSON.stringify(options.body),
-            headers,
-            signal: timeoutController.signal,
-          }).then((result) => {
-            if (stopReason) {
-              try {
-                void result.body?.cancel().catch(() => {});
-              } catch {
-                // Late body cleanup is best-effort.
-              }
-            }
-            return result;
-          });
-          response = await Promise.race([fetchPromise, lifetime]);
-          activeResponse = response;
-        } catch {
-          if (stopReason === "timeout") {
-            throw new DaykeeperReactNativeTransportError({
-              code: "REQUEST_TIMEOUT",
-              message: `The Daykeeper request exceeded ${this.#timeoutMs}ms`,
-              retryable: true,
-              outcomeUnknown: mutating && dispatched,
-            });
-          }
-          if (options.signal?.aborted) {
-            throw new DaykeeperReactNativeTransportError({
-              code: "REQUEST_ABORTED",
-              message: "The Daykeeper request was aborted",
-              outcomeUnknown: mutating && dispatched,
-            });
-          }
-          throw new DaykeeperReactNativeTransportError({
-            code: "NETWORK_ERROR",
-            message: "The Daykeeper customer API could not be reached",
-            retryable: true,
-            outcomeUnknown: mutating && dispatched,
-          });
+          }, discardResponse);
+        } catch (error) {
+          if (error instanceof DaykeeperReactNativeTransportError) throw error;
+          throw networkError();
         }
 
+        // A read that may still refresh its credentials once, on the first
+        // 401 only, unless the server explicitly forbids the replay.
+        const refreshCandidate =
+          !mutating && response.status === 401 && attempt === 0;
+
         let payload: unknown;
-        try {
-          payload = await Promise.race([
-            readJson(response, timeoutController.signal),
-            lifetime,
-          ]);
-        } catch (error) {
-          if (mutating && dispatched) {
-            if (stopReason === "timeout") {
-              throw new DaykeeperReactNativeTransportError({
-                code: "REQUEST_TIMEOUT",
-                message: `The Daykeeper request exceeded ${this.#timeoutMs}ms`,
-                outcomeUnknown: true,
-              });
-            }
-            if (options.signal?.aborted) {
-              throw new DaykeeperReactNativeTransportError({
-                code: "REQUEST_ABORTED",
-                message: "The Daykeeper request was aborted",
-                outcomeUnknown: true,
-              });
-            }
-            if (error instanceof DaykeeperReactNativeTransportError) {
-              throw new DaykeeperReactNativeTransportError({
-                code: error.code,
-                message: error.message,
-                outcomeUnknown: true,
-              });
-            }
-            throw new DaykeeperReactNativeTransportError({
-              code: "INVALID_RESPONSE",
-              message: "The Daykeeper customer API returned invalid JSON",
-              outcomeUnknown: true,
-            });
+        if (refreshCandidate || !response.ok) {
+          // The HTTP status decides the outcome, so the body is read for
+          // advice only. A gateway, proxy or CDN can answer any error status
+          // with an HTML page instead of the contract envelope; parsing that
+          // first used to throw INVALID_RESPONSE and lose both the status and,
+          // on a 401, the one permitted credential refresh.
+          try {
+            payload = await readJson(response, lifetime);
+          } catch (error) {
+            // Only a completed, unparseable body is tolerated. Failed,
+            // stalled, oversized, or cancelled reads never authorize a replay.
+            if (
+              !(error instanceof DaykeeperReactNativeTransportError) ||
+              error.code !== "INVALID_RESPONSE"
+            )
+              throw error;
           }
-          if (error instanceof DaykeeperReactNativeTransportError) throw error;
-          throw new DaykeeperReactNativeTransportError({
-            code: "INVALID_RESPONSE",
-            message: "The Daykeeper customer API returned an invalid response",
-            retryable: true,
-          });
+        } else {
+          payload = await readJson(response, lifetime);
         }
         if (
-          !mutating &&
-          response.status === 401 &&
-          attempt === 0 &&
+          refreshCandidate &&
           !(isRecord(payload) && payload.retryable === false)
-        )
+        ) {
+          discardResponse(response);
           continue;
+        }
         if (!response.ok) {
-          const code =
-            isRecord(payload) &&
-            typeof payload.error === "string" &&
-            SAFE_API_CODES.has(payload.error)
-              ? payload.error
-              : "daykeeper_request_failed";
           throw new DaykeeperReactNativeApiError({
             status: response.status,
-            code,
+            code: isRecord(payload) ? payload.error : undefined,
+            // The contract's message stays unread; only the bounded
+            // nextAction vocabulary is projected.
+            nextAction: isRecord(payload) ? payload.nextAction : undefined,
             retryable:
               !mutating &&
-              code !== "widget_unavailable" &&
               (isRecord(payload) && typeof payload.retryable === "boolean"
                 ? payload.retryable
                 : response.status === 408 ||
@@ -398,15 +264,27 @@ export class DaykeeperReactNativeClient {
             code: "INVALID_RESPONSE",
             message: "The Daykeeper customer API returned an invalid response",
             retryable: true,
-            outcomeUnknown: mutating && dispatched,
           });
         }
         return payload as ResponseBody;
       }
       throw new Error("Unreachable Daykeeper request state");
+    } catch (error) {
+      if (error instanceof DaykeeperReactNativeApiError) throw error;
+      const safeError =
+        error instanceof DaykeeperReactNativeTransportError
+          ? error
+          : networkError();
+      if (!mutating) throw safeError;
+      throw new DaykeeperReactNativeTransportError({
+        code: safeError.code,
+        message: safeError.message,
+        retryable: false,
+        outcomeUnknown: dispatched,
+      });
     } finally {
-      clearTimeout(timeout);
-      options.signal?.removeEventListener("abort", onCallerAbort);
+      if (response) discardResponse(response);
+      lifetime.dispose();
     }
   }
 }
@@ -417,6 +295,28 @@ export function createDaykeeperReactNativeClient(
   return new DaykeeperReactNativeClient(options);
 }
 
+async function resolveToken(
+  provider: DaykeeperReactNativeTokenProvider,
+  context: DaykeeperReactNativeTokenProviderContext,
+): Promise<string> {
+  try {
+    return await provider(context);
+  } catch {
+    throw new DaykeeperReactNativeTransportError({
+      code: "TOKEN_PROVIDER_ERROR",
+      message: "The Daykeeper access token could not be obtained",
+    });
+  }
+}
+
+function networkError(): DaykeeperReactNativeTransportError {
+  return new DaykeeperReactNativeTransportError({
+    code: "NETWORK_ERROR",
+    message: "The Daykeeper customer API transport failed",
+    retryable: true,
+  });
+}
+
 function parseBaseUrl(value: string): string {
   let url: URL;
   try {
@@ -424,7 +324,10 @@ function parseBaseUrl(value: string): string {
   } catch {
     throw configurationError("baseUrl must be a valid absolute URL");
   }
-  const local = ["localhost", "127.0.0.1", "::1"].includes(url.hostname);
+  // URL.hostname keeps the brackets around an IPv6 literal, so a bare "::1"
+  // comparison never matched http://[::1]:3002 and rejected local development.
+  const hostname = url.hostname.replace(/^\[(.+)]$/, "$1").toLowerCase();
+  const local = ["localhost", "127.0.0.1", "::1"].includes(hostname);
   if (url.protocol !== "https:" && !(local && url.protocol === "http:")) {
     throw configurationError(
       "baseUrl must use HTTPS except for loopback development",
@@ -481,7 +384,7 @@ function validateMessage(value: string): string {
 
 async function readJson(
   response: Response,
-  signal?: AbortSignal,
+  lifetime: ReturnType<typeof createRequestLifetime>,
 ): Promise<unknown> {
   const declaredLength = Number(response.headers.get("content-length"));
   if (Number.isFinite(declaredLength) && declaredLength > MAX_RESPONSE_BYTES) {
@@ -494,14 +397,15 @@ async function readJson(
     typeof body.getReader === "function" &&
     typeof TextDecoder === "function"
   ) {
-    return parseJson(await readStream(body, signal));
+    return parseJson(await readStream(body, lifetime));
   }
 
   let text: string;
   try {
-    text = await response.text();
-  } catch {
-    throw invalidResponse();
+    text = await lifetime.run(() => response.text());
+  } catch (error) {
+    if (error instanceof DaykeeperReactNativeTransportError) throw error;
+    throw networkError();
   }
   if (utf8LengthExceeds(text, MAX_RESPONSE_BYTES)) {
     throw responseTooLarge();
@@ -511,41 +415,26 @@ async function readJson(
 
 async function readStream(
   body: ReadableStream<Uint8Array>,
-  signal?: AbortSignal,
+  lifetime: ReturnType<typeof createRequestLifetime>,
 ): Promise<string> {
   const reader = body.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
-  let cancelled = false;
-  const cancel = () => {
-    if (cancelled) return;
-    cancelled = true;
-    try {
-      void Promise.resolve(reader.cancel()).catch(() => {});
-    } catch {
-      // Cleanup must not replace the bounded, sanitized request error.
-    }
-  };
-  if (signal?.aborted) cancel();
-  else signal?.addEventListener("abort", cancel, { once: true });
   try {
     for (;;) {
-      const { done, value } = await reader.read();
+      const { done, value } = await lifetime.run(() => reader.read());
       if (done) break;
       total += value.byteLength;
       if (total > MAX_RESPONSE_BYTES) {
-        cancel();
         throw responseTooLarge();
       }
       chunks.push(value);
     }
+  } catch (error) {
+    if (error instanceof DaykeeperReactNativeTransportError) throw error;
+    throw networkError();
   } finally {
-    signal?.removeEventListener("abort", cancel);
-    try {
-      reader.releaseLock();
-    } catch {
-      // Cleanup must not replace the bounded, sanitized request error.
-    }
+    discardReader(reader);
   }
 
   const bytes = new Uint8Array(total);

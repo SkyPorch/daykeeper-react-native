@@ -12,7 +12,10 @@ export {
   DaykeeperReactNativeApiError,
   DaykeeperReactNativeTransportError,
 } from "./errors.js";
-export type { DaykeeperReactNativeTransportErrorCode } from "./errors.js";
+export type {
+  DaykeeperReactNativeNextAction,
+  DaykeeperReactNativeTransportErrorCode,
+} from "./errors.js";
 export type {
   components as DaykeeperCustomerOpenApiComponents,
   operations as DaykeeperCustomerOpenApiOperations,
