@@ -67,6 +67,12 @@ providers with their own bounded backend operation to avoid wasted work.
 See [`COMPATIBILITY.md`](COMPATIBILITY.md) for the supported runtime contract
 and release certification matrix.
 
+When a dispatched write fails during transport, times out, returns an ambiguous
+408/5xx, or has an invalid success response, `outcomeUnknown` is true and
+`retryable` is false: read current server state before deciding on a deliberate
+new action. Pre-dispatch failures remain ordinary retryable transport errors
+where appropriate.
+
 ## Optional conversation template
 
 The package also exports a presentational conversation surface from `@skyporch/daykeeper-react-native/ui`.
@@ -78,16 +84,13 @@ should begin directly with its transcript. The component does
 not create a client, make requests, track online state, or invent response
 promises. Pass `accentColor`, `accentTextColor`, `accessibilityLabels`, and a
 `keyboardVerticalOffset` when the host supplies branded colors, translations,
-or a navigation bar. On Android, wrap the surface in the host's inset policy
-when edge-to-edge content needs additional bottom padding. See
+or a navigation bar. The host owns transcript and composer theming and
+accessibility labels. On Android, set the host window to
+`android:windowSoftInputMode="adjustResize"` and apply the host's keyboard
+insets policy for edge-to-edge content; do not layer a second default resize
+adjustment on top. See
 [`examples/ConversationTemplateExample.tsx`](examples/ConversationTemplateExample.tsx)
 for a synthetic integration.
-
-When a dispatched write fails during transport, times out, returns an ambiguous
-408/5xx, or has an invalid success response, `outcomeUnknown` is true and
-`retryable` is false: read current server state before deciding on a deliberate
-new action. Pre-dispatch failures remain ordinary retryable transport errors
-where appropriate.
 
 ## Release status
 

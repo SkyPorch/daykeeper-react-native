@@ -97,7 +97,7 @@ export function DaykeeperConversationTemplate({
           }
         >
           {!hideWelcome ? (
-            <View style={styles.welcome} accessibilityRole="text">
+            <View style={styles.welcome}>
               <Text style={[styles.greeting, { color: colors.primary }]}>
                 {greeting}
               </Text>
@@ -111,9 +111,9 @@ export function DaykeeperConversationTemplate({
                     accessibilityLabels?.starterTopics ?? "Starter topics"
                   }
                 >
-                  {starterTopics.map((topic) => (
+                  {starterTopics.map((topic, index) => (
                     <Pressable
-                      key={topic}
+                      key={`${topic}-${index}`}
                       accessibilityRole={
                         onStarterTopicPress ? "button" : undefined
                       }
