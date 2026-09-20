@@ -19,23 +19,35 @@
       "require": "./dist/index.cjs",
       "default": "./dist/index.js"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./ui": {
+      "react-native": {
+        "types": "./dist/ui/index.d.ts",
+        "default": "./dist/ui/index.js"
+      },
+      "types": "./dist/ui/index.d.ts",
+      "import": "./dist/ui/index.js",
+      "require": "./dist/ui/index.cjs",
+      "default": "./dist/ui/index.js"
+    }
   },
   "files": [
     "dist",
     "CHANGELOG.md",
     "COMPATIBILITY.md",
-    "README.md"
+    "README.md",
+    "examples"
   ],
   "scripts": {
-    "build": "tsup src/index.ts --format esm,cjs --dts --sourcemap --target es2020 --clean",
-    "check": "pnpm format:check && pnpm check:generated && pnpm typecheck && pnpm test && pnpm test:hermes-harness && pnpm build && pnpm verify:exports && pnpm smoke:metro && pnpm pack:check",
+    "build": "tsup src/index.ts src/ui/index.tsx --format esm,cjs --dts --sourcemap --target es2020 --clean --external react --external react-native",
+    "check": "pnpm format:check && pnpm check:generated && pnpm typecheck && pnpm test && pnpm test:hermes-harness && pnpm build && pnpm verify:exports && pnpm smoke:metro && pnpm smoke:ui && pnpm pack:check",
     "check:generated": "pnpm generate && git diff --exit-code -- src/generated/schema.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "generate": "openapi-typescript openapi/customer.yaml --output src/generated/schema.ts",
     "pack:check": "npm pack --dry-run --json",
     "smoke:metro": "react-native bundle --platform ios --dev false --entry-file smoke/index.js --bundle-output .smoke/ios.jsbundle && react-native bundle --platform android --dev false --entry-file smoke/index.js --bundle-output .smoke/android.jsbundle",
+    "smoke:ui": "react-native bundle --platform ios --dev false --entry-file smoke/ui.js --bundle-output .smoke/ui-ios.jsbundle && react-native bundle --platform android --dev false --entry-file smoke/ui.js --bundle-output .smoke/ui-android.jsbundle",
     "test": "tsx --test \"test/**/*.test.ts\"",
     "test:hermes-harness": "node --test verification/hermes/safety.test.mjs && tsx --test verification/hermes/android/fixture.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -48,7 +60,13 @@
     "node": ">=20"
   },
   "peerDependencies": {
+    "react": ">=18",
     "react-native": ">=0.79"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
   },
   "publishConfig": {
     "access": "public",
