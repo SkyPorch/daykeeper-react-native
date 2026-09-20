@@ -49,7 +49,7 @@ export function ConversationTemplateExample() {
       {messages.map((message, index) => (
         <View
           accessible
-          accessibilityLabel={`Outgoing message ${index + 1}`}
+          accessibilityLabel={`You: ${message}`}
           key={`${index}-${message}`}
         >
           <Text style={{ color: colors.input }}>{message}</Text>
