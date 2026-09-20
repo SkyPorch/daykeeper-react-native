@@ -64,3 +64,9 @@ jobs:
           name: hermes-ios-receipt
           path: hermes-smoke-results/ios-receipt.json
           if-no-files-found: error
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: success()
+        with:
+          name: hermes-ios-packed-sdk
+          path: ${{ runner.temp }}/daykeeper-packed/
+          if-no-files-found: error
