@@ -7,9 +7,16 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   useColorScheme,
   View,
 } from "react-native";
+
+export const DEFAULT_CONVERSATION_STARTER_TOPICS = [
+  "Getting started",
+  "Account help",
+  "Something else",
+] as const;
 
 export type DaykeeperConversationTemplateProps = {
   teamName?: string;
@@ -19,6 +26,13 @@ export type DaykeeperConversationTemplateProps = {
   accentTextColor?: string;
   starterTopics?: readonly string[];
   onStarterTopicPress?: (topic: string) => void;
+  draft?: string;
+  onDraftChange?: (draft: string) => void;
+  onSend?: (message: string) => void;
+  sending?: boolean;
+  composerPlaceholder?: string;
+  sendLabel?: string;
+  sendingLabel?: string;
   /** Hide the welcome intro when rendering an older, already-active history. */
   hideWelcome?: boolean;
   accessibilityLabels?: {
@@ -26,6 +40,8 @@ export type DaykeeperConversationTemplateProps = {
     conversationStatus?: string;
     starterTopics?: string;
     messageComposer?: string;
+    messageInput?: string;
+    sendButton?: string;
   };
   keyboardVerticalOffset?: number;
   children?: ReactNode;
@@ -42,8 +58,15 @@ export function DaykeeperConversationTemplate({
   body = "Send a message to our team. Replies will appear here.",
   accentColor,
   accentTextColor,
-  starterTopics = [],
+  starterTopics = DEFAULT_CONVERSATION_STARTER_TOPICS,
   onStarterTopicPress,
+  draft = "",
+  onDraftChange,
+  onSend,
+  sending = false,
+  composerPlaceholder = "Write a message",
+  sendLabel = "Send",
+  sendingLabel = "Sending…",
   hideWelcome = false,
   accessibilityLabels,
   keyboardVerticalOffset = 0,
@@ -55,6 +78,24 @@ export function DaykeeperConversationTemplate({
     ...(dark ? darkColors : lightColors),
     accent: accentColor ?? (dark ? darkColors.accent : lightColors.accent),
   };
+  const topicHandler = onStarterTopicPress ?? onDraftChange;
+  const composerContent =
+    composer === null
+      ? null
+      : (composer ?? (
+          <BuiltInComposer
+            accentTextColor={accentTextColor}
+            accessibilityLabels={accessibilityLabels}
+            colors={colors}
+            draft={draft}
+            onDraftChange={onDraftChange}
+            onSend={onSend}
+            placeholder={composerPlaceholder}
+            sending={sending}
+            sendingLabel={sendingLabel}
+            sendLabel={sendLabel}
+          />
+        ));
 
   return (
     <SafeAreaView
@@ -104,7 +145,7 @@ export function DaykeeperConversationTemplate({
               <Text style={[styles.body, { color: colors.secondary }]}>
                 {body}
               </Text>
-              {starterTopics.length > 0 ? (
+              {starterTopics.length > 0 && topicHandler ? (
                 <View
                   style={styles.topicList}
                   accessibilityLabel={
@@ -114,12 +155,13 @@ export function DaykeeperConversationTemplate({
                   {starterTopics.map((topic, index) => (
                     <Pressable
                       key={`${topic}-${index}`}
-                      accessibilityRole={
-                        onStarterTopicPress ? "button" : undefined
-                      }
+                      accessibilityRole="button"
                       accessibilityLabel={topic}
-                      disabled={!onStarterTopicPress}
-                      onPress={() => onStarterTopicPress?.(topic)}
+                      accessibilityState={{
+                        disabled: !topicHandler || sending,
+                      }}
+                      disabled={!topicHandler || sending}
+                      onPress={() => topicHandler(topic)}
                       style={({ pressed }) => [
                         styles.topic,
                         {
@@ -143,18 +185,97 @@ export function DaykeeperConversationTemplate({
           {children}
         </ScrollView>
 
-        {composer ? (
+        {composerContent ? (
           <View
             accessibilityLabel={
               accessibilityLabels?.messageComposer ?? "Message composer"
             }
             style={[styles.composer, { borderTopColor: colors.border }]}
           >
-            {composer}
+            {composerContent}
           </View>
         ) : null}
       </KeyboardAvoidingView>
     </SafeAreaView>
+  );
+}
+
+type BuiltInComposerProps = {
+  colors: typeof lightColors;
+  accentTextColor?: string;
+  accessibilityLabels?: DaykeeperConversationTemplateProps["accessibilityLabels"];
+  draft: string;
+  onDraftChange?: (draft: string) => void;
+  onSend?: (message: string) => void;
+  placeholder: string;
+  sending: boolean;
+  sendingLabel: string;
+  sendLabel: string;
+};
+
+function BuiltInComposer({
+  accentTextColor,
+  accessibilityLabels,
+  colors,
+  draft,
+  onDraftChange,
+  onSend,
+  placeholder,
+  sending,
+  sendingLabel,
+  sendLabel,
+}: BuiltInComposerProps) {
+  const disabled =
+    sending || !onDraftChange || !onSend || draft.trim().length === 0;
+  return (
+    <View style={styles.composerRow}>
+      <TextInput
+        accessibilityLabel={accessibilityLabels?.messageInput ?? "Message"}
+        editable={!sending && Boolean(onDraftChange)}
+        multiline
+        onChangeText={onDraftChange}
+        onSubmitEditing={() => {
+          if (!disabled) onSend(draft.trim());
+        }}
+        placeholder={placeholder}
+        placeholderTextColor={colors.secondary}
+        style={[
+          styles.input,
+          {
+            backgroundColor: colors.card,
+            borderColor: colors.border,
+            color: colors.primary,
+          },
+        ]}
+        value={draft}
+      />
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabels?.sendButton ?? sendLabel}
+        accessibilityState={{ disabled, busy: sending }}
+        disabled={disabled}
+        onPress={() => onSend?.(draft.trim())}
+        style={({ pressed }) => [
+          styles.sendButton,
+          { backgroundColor: colors.accent },
+          disabled && styles.sendButtonDisabled,
+          pressed && styles.topicPressed,
+        ]}
+      >
+        <Text
+          style={[
+            styles.sendText,
+            {
+              color:
+                accentTextColor ??
+                (colors.accent === darkColors.accent ? "#171722" : "#FFFFFF"),
+            },
+          ]}
+        >
+          {sending ? sendingLabel : sendLabel}
+        </Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -216,4 +337,24 @@ const styles = StyleSheet.create({
   topicPressed: { opacity: 0.7 },
   topicText: { fontSize: 15, fontWeight: "600" },
   composer: { borderTopWidth: 1, padding: 12 },
+  composerRow: { alignItems: "flex-end", flexDirection: "row", gap: 8 },
+  input: {
+    flex: 1,
+    borderRadius: 12,
+    borderWidth: 1,
+    minHeight: 44,
+    maxHeight: 120,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  sendButton: {
+    alignItems: "center",
+    alignSelf: "flex-end",
+    borderRadius: 10,
+    minWidth: 72,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  sendButtonDisabled: { opacity: 0.45 },
+  sendText: { color: "#FFFFFF", fontSize: 15, fontWeight: "700" },
 });
