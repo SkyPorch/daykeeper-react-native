@@ -6,8 +6,18 @@
     "moduleResolution": "NodeNext",
     "noEmit": true,
     "skipLibCheck": true,
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@skyporch/daykeeper-react-native/ui": ["src/ui/index.tsx"]
+    },
     "strict": true,
     "target": "ES2022"
   },
-  "include": ["src/**/*.ts", "test/**/*.ts"]
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "test/**/*.ts",
+    "examples/**/*.tsx"
+  ]
 }

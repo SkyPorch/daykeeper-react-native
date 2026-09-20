@@ -4,8 +4,10 @@ The official headless React Native client for customer-facing Daykeeper support
 experiences. It is generated from the Daykeeper customer API contract and is
 designed for Expo and bare React Native applications on iOS and Android.
 
-This package contains no native module and no embedded support UI. It provides
-typed identity, conversation, message, unread, seen, and anonymous-claim APIs.
+This package contains no native module and keeps its core client headless. An
+optional presentational conversation template is available from the `/ui`
+entrypoint. The core provides typed identity, conversation, message, unread,
+seen, and anonymous-claim APIs.
 Push notifications, attachments, deep links, and native UI can be added here
 without coupling consuming applications to Daykeeper's private platform or to
 Chatwoot.
@@ -64,6 +66,22 @@ providers with their own bounded backend operation to avoid wasted work.
 
 See [`COMPATIBILITY.md`](COMPATIBILITY.md) for the supported runtime contract
 and release certification matrix.
+
+## Optional conversation template
+
+The package also exports a presentational conversation surface from `@skyporch/daykeeper-react-native/ui`.
+It accepts a team name, greeting, body, optional starter topics, transcript
+children, and a composer slot. The host owns message state and calls its own
+transport. The welcome intro stays at the start of the transcript through the
+first outgoing message; set `hideWelcome` when rendering an older history that
+should begin directly with its transcript. The component does
+not create a client, make requests, track online state, or invent response
+promises. Pass `accentColor`, `accentTextColor`, `accessibilityLabels`, and a
+`keyboardVerticalOffset` when the host supplies branded colors, translations,
+or a navigation bar. On Android, wrap the surface in the host's inset policy
+when edge-to-edge content needs additional bottom padding. See
+[`examples/ConversationTemplateExample.tsx`](examples/ConversationTemplateExample.tsx)
+for a synthetic integration.
 
 When a dispatched write fails during transport, times out, returns an ambiguous
 408/5xx, or has an invalid success response, `outcomeUnknown` is true and
