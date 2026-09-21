@@ -304,20 +304,4 @@ await writeFile(
   join(root, ".smoke/latest-package.json"),
   JSON.stringify(result, null, 2),
 );
-console.log(
-  JSON.stringify(
-    {
-      ...result,
-      caches: caches.map(({ run, summary }) => ({ run, summary })),
-      runs: runs.map(({ run, cases, calls }) => ({ run, cases, calls })),
-      boundaries: boundaries.map(({ run, strict, summary, cookie }) => ({
-        run,
-        strict,
-        summary,
-        cookie,
-      })),
-    },
-    null,
-    2,
-  ),
-);
+console.log(JSON.stringify({ status: "passed", checks: result.checks }));

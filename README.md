@@ -139,9 +139,11 @@ a completed legacy empty/non-JSON 401 does.
 
 A usage ceiling can return HTTP 429 with `retryable: false`. Show suitable local
 copy for its stable code and let a workspace administrator review usage.
-Only documented, allowlisted error codes enter SDK error messages, stacks, and
-serialization; unknown codes become `daykeeper_request_failed`. Raw server
-messages, next-action URLs, and credential/transport errors are not copied.
+Server error codes matching `^[a-z][a-z0-9_]{2,63}$` are preserved in SDK
+errors, including codes introduced after this release. Handle unfamiliar codes
+with a generic recovery message. Malformed codes become
+`daykeeper_request_failed`. Raw server messages, next-action URLs, and
+credential/transport errors are not copied.
 
 On logout or account change, abort outstanding calls, clear customer UI/history
 and in-memory token caches, and ignore results belonging to the old session.
