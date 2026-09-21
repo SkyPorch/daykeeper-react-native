@@ -2,11 +2,11 @@
 
 ## Version matrix
 
-| Package version      | Contract consumed                     | Contract version | Contract tag      | Contract commit                            |
-| -------------------- | ------------------------------------- | ---------------- | ----------------- | ------------------------------------------ |
-| `0.2.0` (unreleased) | customer (`openapi/customer.yaml`)    | 0.1.0            | `v1.1.0`          | `c9a0175d0053f1a2d57c9329f6d3a36ec6acdb71` |
-| `0.1.0` (published)  | customer (`openapi/customer.yaml`)    | 0.1.0            | `v1.0.0`          | `35f5bd45fe0c6a6901766543bff90dae6838b965` |
-| any                  | management (`openapi/daykeeper.yaml`) | 0.2.0            | not consumed here | not consumed here                          |
+| Package version     | Contract consumed                     | Contract version | Contract tag      | Contract commit                            |
+| ------------------- | ------------------------------------- | ---------------- | ----------------- | ------------------------------------------ |
+| `0.2.0`             | customer (`openapi/customer.yaml`)    | 0.1.0            | `v1.1.0`          | `c9a0175d0053f1a2d57c9329f6d3a36ec6acdb71` |
+| `0.1.0` (published) | customer (`openapi/customer.yaml`)    | 0.1.0            | `v1.0.0`          | `35f5bd45fe0c6a6901766543bff90dae6838b965` |
+| any                 | management (`openapi/daykeeper.yaml`) | 0.2.0            | not consumed here | not consumed here                          |
 
 This package consumes only the **customer** contract. The customer contract
 snapshot is pinned to immutable repository tag `v1.1.0`; its OpenAPI `info.version`
