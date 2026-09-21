@@ -1,11 +1,10 @@
 # Changelog
 
-## 0.2.0 (unreleased)
+## 0.2.0 — 2026-09-21
 
-The unreleased candidate that began as `0.1.1` was renumbered `0.2.0` for the
-native transport break, and `package.json` now reads `0.2.0`. Nothing in this
-repository claims `0.1.1` as a release version. `0.1.0` remains the published
-baseline on npm until this version is approved and released.
+This version introduces the native transport break described below. The
+pre-release candidate was renumbered from `0.1.1` to `0.2.0`; `0.1.1` was never
+released.
 
 ### Breaking
 
