@@ -2,7 +2,15 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const manifest = JSON.parse(await readFile("package.json", "utf8"));
-const expectedTag = process.env.GITHUB_REF_NAME;
+// Manual checks may select a branch or commit and have no release tag.
+// The release event must still match the version exactly, including prepublish.
+const expectedTag =
+  process.env.GITHUB_EVENT_NAME === "workflow_dispatch"
+    ? undefined
+    : process.env.GITHUB_REF_NAME;
+if (process.env.GITHUB_EVENT_NAME === "release") {
+  assert.ok(expectedTag, "A release event requires a tag");
+}
 
 assert.notEqual(
   manifest.license,

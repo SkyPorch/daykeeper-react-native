@@ -1,16 +1,100 @@
 # Changelog
 
-## 0.1.1
+## 0.2.0 (unreleased)
 
-- Make writes single-dispatch, honor explicit read retry vetoes, and mark
-  dispatched write transport or ambiguous server failures as `outcomeUnknown`
-  without claiming non-delivery.
+The unreleased candidate that began as `0.1.1` was renumbered `0.2.0` for the
+native transport break, and `package.json` now reads `0.2.0`. Nothing in this
+repository claims `0.1.1` as a release version. `0.1.0` remains the published
+baseline on npm until this version is approved and released.
 
-- Document API-only inbox support and the `widget_unavailable` response for
-  widget-specific identity and anonymous-claim operations.
-- Preserve known gateway error codes while reducing unknown remote values to
-  `daykeeper_request_failed`, preventing arbitrary response text from leaking
-  through SDK errors.
+### Breaking
+
+- **Native transport must be configured explicitly.** The native export no
+  longer falls back to React Native's XHR-based Fetch. Callers must supply a
+  `fetch` implementation that rejects redirects and omits ambient cookies; on
+  the validated Expo 57 runtime, `fetch` from `expo/fetch`. A client
+  constructed without one now fails before credentials are requested.
+- **Server error codes pass through instead of being allowlisted.** Any value
+  matching `^[a-z][a-z0-9_]{2,63}$` reaches
+  `DaykeeperReactNativeApiError.code` unchanged, including codes newer than the
+  installed SDK. Code that assumed the previous 23-entry allowlist — and so
+  assumed unknown codes arrived as `daykeeper_request_failed` — must handle an
+  open vocabulary.
+
+This package consumes the **customer** contract only, which remains 0.1.0. The
+newly required `Idempotency-Key` header on flow mutations, and the `200`
+returned alongside `201` for a replayed mutation, are **management** contract
+0.2.0 changes and do not apply here. The breaking changes above are this
+package's own. See [`COMPATIBILITY.md`](COMPATIBILITY.md).
+
+### Changes
+
+- Preserve the API-only inbox contract: widget identity and anonymous-thread
+  claim return `409 widget_unavailable` before contacting the provider.
+- Preserve every server error code whose shape is a code. Codes matching
+  `^[a-z][a-z0-9_]{2,63}$` pass through unchanged; only values that fail that
+  shape collapse to `daykeeper_request_failed`. The previous 23-entry
+  allowlist collapsed live gateway codes the consuming app switches on, such
+  as `support_gateway_request_failed`, `widget_token_required`,
+  `invalid_tenant` and `conversation_not_found`. Message projection is
+  unchanged: no raw body text enters the message, stack or serialization.
+- Decide on the HTTP status before parsing an error body. An HTML error page
+  from a proxy or CDN no longer discards the status as `INVALID_RESPONSE`, and
+  a non-JSON 401 still authorizes the single credential refresh on reads.
+- Accept `http://[::1]` and other bracketed IPv6 loopback base URLs for local
+  development. The loopback check compared against an unbracketed `::1` and
+  never matched.
+- Expose `DaykeeperReactNativeApiError.nextAction`, projected through a closed
+  allowlist of `review_usage`, `review_setup` and `refresh_conversation` and
+  included in `toJSON` when present. Unrecognized values become `undefined`.
+  The contract's `message` field remains unread.
+- Verify the vendored contract's provenance in `check:generated`. The new
+  `scripts/check-generated.mjs` recomputes the SHA-256 and Git blob id of
+  `openapi/customer.yaml`, requires both plus the upstream commit to appear in
+  `openapi/SOURCE.md`, and regenerates types into a temporary directory, so a
+  contract edit can no longer pass by regenerating alongside it.
+- Re-vendor the customer contract from `daykeeper-openapi` commit `4a2b82c`,
+  where `CustomerError` is `additionalProperties: true` and the `error` code is
+  documented as extensible.
+
+- Set `cache: "no-store"` on every dispatch. Native exports also send
+  `Cache-Control: no-cache, no-store` for transports that ignore Fetch cache mode.
+  Keep browser cache headers under standard Fetch control to avoid changing CORS.
+- Add seeded-cache account-switch, revoked-credential, freshness and no-new-storage
+  probes against real HTTP, with mandatory native positive cache controls.
+
+- Breaking native setup change: configure a Fetch transport explicitly. The
+  native export no longer silently falls back to React Native's XHR-based Fetch.
+  On the validated Expo 57 runtime, import `fetch` from `expo/fetch` and supply
+  it as the client `fetch` option. Bare native transports must enforce the same
+  redirect rejection and cookie omission contract; Expo is not a dependency.
+- Set `redirect: "error"` and `credentials: "omit"` on every SDK request,
+  including credential refresh. Node/web standard Fetch remains the default.
+- Verify native and Node ESM/CJS exports, declarations and installed-package
+  policy behavior independently. Android/release certification remains open.
+
+The following changes were developed in the candidate previously numbered
+`0.1.1` and ship as part of `0.2.0`; `0.1.0` remains the published baseline
+until release approval.
+
+- Never replay writes after authentication failure; classify uncertain write
+  outcomes explicitly and make all write errors non-retryable.
+- Honor first-read HTTP 401 `retryable: false` before credential refresh, within
+  the original deadline and response size limit.
+- Allowlist safe API error codes; redact unknown codes from messages, stacks,
+  and serialization. Treat failed native body reads as transport failures.
+- Respect explicit server retry advice for customer API errors, including
+  non-retryable quota ceilings; preserve older status-only read classification.
+- Align vendored OpenAPI license metadata and record the exact source commit
+  and checksum; generated types and runtime behavior are unchanged.
+- Classify credential-provider failures as non-retryable `TOKEN_PROVIDER_ERROR`
+  without exposing raw provider errors; timeout and cancellation stay distinct.
+- Bound credential acquisition, authentication refresh, transport, and buffered
+  or streaming response reads by one cancellable request deadline.
+- Prevent late dispatch, release failed response bodies without waiting for
+  cleanup, and sanitize credential-provider failures.
+- Make public SDK and generated contract documentation
+  infrastructure-provider neutral.
 
 ## 0.1.0
 
@@ -20,5 +104,5 @@
   `Response.text()` behavior with bounded UTF-8 response validation.
 - Add explicit React Native package exports, rotating tokens, request timeouts,
   and stable customer-safe errors.
-- Preserve reverse-proxy path prefixes and retry reads exactly once with a
-  forced token refresh after an HTTP 401 response.
+- Preserve reverse-proxy path prefixes and retry exactly once with a forced
+  token refresh after an HTTP 401 response.
