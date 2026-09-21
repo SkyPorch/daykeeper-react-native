@@ -48,28 +48,4 @@ for safe agent retries and [Intercom's native session lifecycle](https://develop
 for app/session coordination. Daykeeper does not inherit either product's
 capabilities merely by following its conventions.
 
-## Recorded candidate evidence
-
-On 2026-08-31, the candidate tarball SHA-256
-`62e312ad6600d7595bc3523ef96bed3e8ec73c93585d8d375c25a4e91f5deea8`
-passed 60 cases on iOS 26.5 / React Native 0.86.2 / React 19.2.3 / Hermes:
-62 SDK dispatches, 64 wire requests, and exactly one wire request for each of
-48 write cases. Only the dropped GET had extra native wire attempts (three
-wire requests from one fetch call). Both installed Node exports passed the
-same matrix with 62 dispatches and 62 wire requests each; 93 unit tests and
-iOS/Android Metro builds passed. The downstream candidate regression suite
-passed 2,251 tests, with an explicit expected write-retry contract change.
-
-The final Node 20 CI fix enumerates test files instead of relying on newer
-Node glob expansion. Its tarball SHA-256 is
-`6982ecae9e963b362a4f02acb7a8506eb996906e507d9333f94400e7d4703350`.
-All six runtime/declaration/map files are byte-identical to the native-tested
-artifact above; only test-script package metadata changed. The final artifact
-also passed the complete 2,251-test downstream matrix. Keep the artifact hashes
-distinct rather than attributing the native run to a later tarball.
-
-The first native launch exited in the development host's push-module
-initialization before reaching the fixture. A cold start succeeded. This is
-retained as a native-host stability follow-up, not suppressed or counted as a
-passing SDK run. Android device/runtime and production release certification
-are still required; Metro compilation alone does not establish runtime parity.
+Retain run-specific receipts and integration results privately.

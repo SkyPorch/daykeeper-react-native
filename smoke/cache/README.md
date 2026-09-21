@@ -45,18 +45,4 @@ An injected transport remains trusted to honor the contract. These tests do not
 certify hostile proxies, browser service workers, Android, release builds or
 application-level persistence/account-switch UI behavior.
 
-## Recorded native run
-
-Candidate tarball SHA256
-`eaf9ad2da540902230deeb8485bbd505a0e8b227792db5902f2130d2e53d5f54`
-passed all 24 SDK cache cases with eight required cache-hit controls on
-iOS 26.5 / React Native 0.86.2 / Hermes / Expo 57.0.15. The preceding SDK candidate
-reproduced cross-account cache reuse under the same synthetic cacheable policy.
-The hardened artifact also passed the 56 native redirect/cookie cases and 60
-replay/cancellation/body-limit cases. Two early runs without every positive cache
-control were not credited; the fixture now leaves completed seeds uncanceled and
-sends explicit response lengths. Bounds and required controls are unchanged.
-
-Accepted evidence came from fresh ports with the simulator app's process and
-connections verified. Earlier reused-port receipts were excluded when an
-unexpected client reconnected. No production data or endpoint was tested.
+Retain run-specific receipts and integration results privately.
