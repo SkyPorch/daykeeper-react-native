@@ -68,11 +68,17 @@ assert.equal(artifact.name, "@skyporch/daykeeper-react-native");
 assert.equal(artifact.version, manifest.version);
 for (const file of artifact.files) {
   assert(
-    /^(dist\/(index|native|chunk-[A-Z0-9]+)\.(js|cjs|d\.ts|d\.cts)(\.map)?|package\.json|LICENSE|README\.md|CHANGELOG\.md|COMPATIBILITY\.md)$/.test(
+    /^(dist\/(index|native|chunk-[A-Z0-9]+)\.(js|cjs|d\.ts|d\.cts)(\.map)?|package\.json|LICENSE|LICENSE-APACHE-2\.0|NOTICE|README\.md|CHANGELOG\.md|COMPATIBILITY\.md)$/.test(
       file.path,
     ),
     `Unexpected packed file: ${file.path}`,
   );
+}
+// The generated types derive from the Apache-2.0 OpenAPI contract, so the
+// tarball must carry that license text alongside the MIT LICENSE and NOTICE.
+const packedPaths = new Set(artifact.files.map((file) => file.path));
+for (const required of ["LICENSE", "LICENSE-APACHE-2.0", "NOTICE"]) {
+  assert(packedPaths.has(required), `Missing packed file: ${required}`);
 }
 const runtimeRoot = await realpath(join(root, "node_modules/@babel/runtime"));
 const runtime = await pack(runtimeRoot);
