@@ -68,7 +68,7 @@ assert.equal(artifact.name, "@skyporch/daykeeper-react-native");
 assert.equal(artifact.version, manifest.version);
 for (const file of artifact.files) {
   assert(
-    /^(dist\/(index|native|chunk-[A-Z0-9]+)\.(js|cjs|d\.ts|d\.cts)(\.map)?|package\.json|LICENSE|README\.md|CHANGELOG\.md|COMPATIBILITY\.md)$/.test(
+    /^(dist\/(index|native|chunk-[A-Z0-9]+)\.(js|cjs|d\.ts|d\.cts)(\.map)?|package\.json|LICENSE|NOTICE|README\.md|CHANGELOG\.md|COMPATIBILITY\.md)$/.test(
       file.path,
     ),
     `Unexpected packed file: ${file.path}`,

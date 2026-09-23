@@ -1,0 +1,10 @@
+Daykeeper React Native SDK
+Copyright (c) 2026 SkyPorch
+
+Licensed under the MIT License. See the LICENSE file.
+
+The TypeScript types in this package are generated from the Daykeeper customer
+OpenAPI description, copied from SkyPorch/daykeeper-openapi and licensed under
+the Apache License, Version 2.0. The source repository keeps that description
+under `openapi/customer.yaml` and records the exact tag and commit in
+`openapi/SOURCE.md`.
