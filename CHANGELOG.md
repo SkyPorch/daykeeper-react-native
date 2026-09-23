@@ -118,8 +118,8 @@ until release approval.
 - Make public SDK and generated contract documentation
   infrastructure-provider neutral.
 - Ship a `NOTICE` file recording the Apache-2.0 contract the generated types
-  come from, and list supported versions and a private reporting channel in
-  `SECURITY.md`.
+  come from, with the full Apache-2.0 text as `LICENSE-APACHE-2.0`, and list
+  supported versions and a private reporting channel in `SECURITY.md`.
 
 ## 0.1.0
 
