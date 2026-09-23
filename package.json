@@ -27,6 +27,7 @@
     "dist",
     "CHANGELOG.md",
     "COMPATIBILITY.md",
+    "NOTICE",
     "README.md"
   ],
   "scripts": {
