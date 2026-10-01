@@ -42,14 +42,18 @@ jobs:
           device_type=$(xcrun simctl list devicetypes -j | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const d=JSON.parse(s).devicetypes.find(x=>x.name==="iPhone 16")||JSON.parse(s).devicetypes.find(x=>x.name.startsWith("iPhone ")); if(!d) process.exit(1); process.stdout.write(d.identifier)})')
           name="DaykeeperHermesSmoke-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           udid=$(xcrun simctl create "$name" "$device_type" "$runtime")
+          receipt="$RUNNER_TEMP/daykeeper-hermes-simulator.json"
+          node -e 'const fs=require("node:fs");const [path,udid,name,runId,runAttempt]=process.argv.slice(1);fs.writeFileSync(path,JSON.stringify({udid,name,runId,runAttempt})+"\n",{mode:0o600})' "$receipt" "$udid" "$name" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT"
           echo "udid=$udid" >> "$GITHUB_OUTPUT"
           echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "receipt=$receipt" >> "$GITHUB_OUTPUT"
           xcrun simctl boot "$udid"
           xcrun simctl bootstatus "$udid" -b
       - name: Run bundled Hermes app on iOS Simulator
         env:
           SIMULATOR_UDID: ${{ steps.simulator.outputs.udid }}
           SIMULATOR_NAME: ${{ steps.simulator.outputs.name }}
+          SIMULATOR_RECEIPT: ${{ steps.simulator.outputs.receipt }}
         run: node verification/hermes/ios/run.mjs --execute "$RUNNER_TEMP/daykeeper-packed/pack.json"
       - name: Delete disposable iOS simulator
         if: always() && steps.simulator.outputs.udid != ''

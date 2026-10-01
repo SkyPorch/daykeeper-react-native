@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  isOwnedBootedSimulator,
   validateHost,
   validateIosHost,
+  validateIosSimulatorReceipt,
   waitForMarker,
 } from "./safety.mjs";
 const env = {
@@ -48,58 +48,25 @@ test("requires an explicitly owned hosted macOS simulator", () => {
   ])
     assert.throws(() => validateIosHost(invalid, ["--execute", "pack.json"]));
 });
-test("confirms simulator inventory matches the owned run name and UDID", () => {
-  const devices = {
-    devices: {
-      "com.apple.CoreSimulator.SimRuntime.iOS-26-0": [
-        {
-          udid: "01234567-89ab-cdef-0123-456789abcdef",
-          name: "DaykeeperHermesSmoke-123-1",
-          state: "Booted",
-        },
-        {
-          udid: "fedcba98-7654-3210-fedc-ba9876543210",
-          name: "Different simulator",
-          state: "Booted",
-        },
-      ],
-    },
+test("binds Hermes execution to the workflow-created simulator receipt", () => {
+  const expected = {
+    udid: "01234567-89ab-cdef-0123-456789abcdef",
+    name: "DaykeeperHermesSmoke-123-1",
+    runId: "123",
+    runAttempt: "1",
   };
-  assert.equal(
-    isOwnedBootedSimulator(
-      devices,
-      "01234567-89ab-cdef-0123-456789abcdef",
-      "DaykeeperHermesSmoke-123-1",
-    ),
-    true,
-  );
-  assert.equal(
-    isOwnedBootedSimulator(
-      devices,
-      "fedcba98-7654-3210-fedc-ba9876543210",
-      "DaykeeperHermesSmoke-123-1",
-    ),
-    false,
-  );
-  assert.equal(
-    isOwnedBootedSimulator(
-      {
-        devices: {
-          runtime: [
-            {
-              ...devices.devices[
-                "com.apple.CoreSimulator.SimRuntime.iOS-26-0"
-              ][0],
-              state: "Shutdown",
-            },
-          ],
-        },
-      },
-      "01234567-89ab-cdef-0123-456789abcdef",
-      "DaykeeperHermesSmoke-123-1",
-    ),
-    false,
-  );
+  validateIosSimulatorReceipt({ ...expected }, expected);
+  for (const altered of [
+    { ...expected, udid: "fedcba98-7654-3210-fedc-ba9876543210" },
+    { ...expected, name: "DaykeeperHermesSmoke-123-2" },
+    { ...expected, runId: "456" },
+    { ...expected, runAttempt: "2" },
+  ]) {
+    assert.throws(
+      () => validateIosSimulatorReceipt(altered, expected),
+      /does not match this run attempt/,
+    );
+  }
 });
 const marker = "DAYKEEPER_HERMES_SMOKE_OK_abcd-1234";
 test("waits for exact rendered current-run marker, not substrings", async () => {
