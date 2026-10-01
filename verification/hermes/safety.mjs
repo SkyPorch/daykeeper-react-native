@@ -43,6 +43,17 @@ export function validateIosHost(env, args) {
   return { udid: env.SIMULATOR_UDID, name: env.SIMULATOR_NAME };
 }
 
+export function isOwnedBootedSimulator(devices, udid, name) {
+  const matches = Object.values(devices?.devices ?? {})
+    .flat()
+    .filter((device) => device?.udid === udid);
+  return (
+    matches.length === 1 &&
+    matches[0].name === name &&
+    matches[0].state === "Booted"
+  );
+}
+
 export async function waitForMarker(
   read,
   marker,

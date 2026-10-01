@@ -10,7 +10,7 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { validateIosHost } from "../safety.mjs";
+import { isOwnedBootedSimulator, validateIosHost } from "../safety.mjs";
 
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 const { udid: simulator, name: simulatorName } = validateIosHost(
@@ -38,10 +38,14 @@ function command(exe, args, options = {}) {
     ...options,
   });
 }
-// The workflow creates this per-attempt simulator and gates this step on a
-// successful `simctl bootstatus -b`. Re-enumerating every available device
-// here is both redundant and can hang CoreSimulator while its System App is
-// starting on a freshly booted GitHub-hosted runner.
+// Restrict CoreSimulator's inventory query to this run's uniquely named
+// device. A full inventory query timed out while the freshly booted runner's
+// System App was starting.
+const devices = JSON.parse(
+  command("xcrun", ["simctl", "list", "devices", simulatorName, "-j"]).trim(),
+);
+if (!isOwnedBootedSimulator(devices, simulator, simulatorName))
+  throw new Error("refusing non-booted owned simulator");
 const work = mkdtempSync(path.join(tmpdir(), "daykeeper-hermes-ios-smoke-"));
 const app = path.join(work, "app");
 const derivedData = path.join(work, "derived-data");
