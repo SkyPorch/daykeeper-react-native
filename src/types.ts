@@ -12,6 +12,7 @@ export type DaykeeperConversationResult = Schemas["ConversationResult"];
 export type DaykeeperUnreadSummary = Schemas["UnreadSummary"];
 export type DaykeeperSeenResult = Schemas["SeenResult"];
 export type DaykeeperMessageList = Schemas["MessageList"];
+export type DaykeeperCursorMessageList = Schemas["CursorMessageList"];
 export type DaykeeperMessageResult = Schemas["MessageResult"];
 export type DaykeeperClaimConversationResult =
   Schemas["ClaimConversationResult"];

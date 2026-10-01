@@ -11,8 +11,8 @@ import type {
   DaykeeperClaimConversationResult,
   DaykeeperConversationList,
   DaykeeperConversationResult,
+  DaykeeperCursorMessageList,
   DaykeeperCustomerIdentity,
-  DaykeeperMessageList,
   DaykeeperMessageResult,
   DaykeeperSeenResult,
   DaykeeperUnreadSummary,
@@ -112,19 +112,37 @@ export class DaykeeperReactNativeClient {
       after?: number;
       before?: number;
     } = {},
-  ): Promise<DaykeeperMessageList> {
+  ): Promise<DaykeeperCursorMessageList> {
     const id = positiveInteger(conversationId, "conversationId");
     if (options.after !== undefined && options.before !== undefined) {
       throw configurationError("after and before cannot be used together");
     }
     const cursor =
       options.after !== undefined
-        ? `?after=${positiveCursor(options.after, "after")}`
+        ? `&after=${positiveCursor(options.after, "after")}`
         : options.before !== undefined
-          ? `?before=${positiveCursor(options.before, "before")}`
+          ? `&before=${positiveCursor(options.before, "before")}`
           : "";
-    return this.#request(`/v1/conversations/${id}/messages${cursor}`, {
-      signal: options.signal,
+    return this.#request<unknown>(
+      `/v1/conversations/${id}/messages?pagination=cursor${cursor}`,
+      {
+        signal: options.signal,
+      },
+    ).then((page) => {
+      if (
+        !isRecord(page) ||
+        page.pagination !== "cursor" ||
+        !Array.isArray(page.messages) ||
+        !page.messages.every(
+          (message) =>
+            isRecord(message) &&
+            Number.isSafeInteger(message.id) &&
+            (message.id as number) > 0,
+        )
+      ) {
+        throw invalidResponse();
+      }
+      return page as DaykeeperCursorMessageList;
     });
   }
 

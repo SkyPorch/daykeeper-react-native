@@ -42,7 +42,12 @@ test("every native operation dispatches with strict redirect and cookie policy",
     getAccessToken: () => "synthetic-customer-token",
     fetch: async (input, init) => {
       requests.push(new Request(input, init));
-      return Response.json({});
+      const url = new URL(input.toString());
+      return Response.json(
+        url.pathname.endsWith("/messages")
+          ? { pagination: "cursor", messages: [] }
+          : {},
+      );
     },
   });
   await client.getIdentity();

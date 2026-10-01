@@ -31,10 +31,16 @@ export async function startCacheFixture(port = 0) {
       const record = request.url.match(/^\/record\/([a-z0-9-]{1,80})$/);
       if (record && request.method === "GET")
         return json(200, records.get(record[1]) ?? []);
-      const match = request.url.match(
+      const requestUrl = new URL(request.url, "http://127.0.0.1");
+      const match = requestUrl.pathname.match(
         /^\/case\/([a-z0-9-]{1,80})\/(public|private|no-store)\/v1\/(identity|unread|conversations(?:\/1\/messages)?)$/,
       );
       if (!match || request.method !== "GET") return json(404, {});
+      if (
+        match[3] === "conversations/1/messages" &&
+        requestUrl.searchParams.get("pagination") !== "cursor"
+      )
+        return json(400, {});
       const subjects = new Map([
         ["Bearer synthetic-a", "a"],
         ["Bearer synthetic-b", "b"],
@@ -66,6 +72,7 @@ export async function startCacheFixture(port = 0) {
           identity: { identifier: subject },
           conversations: [],
           widgetConversationId: null,
+          pagination: "cursor",
           messages: [],
           unreadCount: 0,
           fixture: { subject, count: receipt.count },

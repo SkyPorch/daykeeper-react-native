@@ -1,7 +1,10 @@
 const reads = {
   identity: ["identity", (client) => client.getIdentity()],
   conversations: ["conversations", (client) => client.listConversations()],
-  messages: ["conversations/1/messages", (client) => client.listMessages(1)],
+  messages: [
+    "conversations/1/messages?pagination=cursor",
+    (client) => client.listMessages(1),
+  ],
   unread: ["unread", (client) => client.getUnread()],
 };
 const check = (condition, message) => {

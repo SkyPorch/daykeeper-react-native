@@ -21,12 +21,14 @@ released, so every change below is relative to the published `0.1.0`.
 
 ### Breaking
 
-- **Message history is now explicitly paginated.** The customer 0.2.0 contract
-  returns only the latest 20 visible messages for an uncursored read. Callers
-  that need older messages must page with `before` and continue until an empty
-  response; a short non-empty response does not prove exhaustion. The new
-  `before` and existing `after` cursor are mutually exclusive positive safe
-  integers.
+- **Message history opts into the marked cursor profile.** Every
+  `listMessages()` request includes `pagination=cursor`; initial reads return
+  only the latest 20 visible messages. Callers that need older messages page
+  with `before` until an empty response; a short non-empty response does not
+  prove exhaustion. The new `before` and existing `after` cursor are mutually
+  exclusive positive safe integers. A legacy gateway response without the
+  required `pagination: "cursor"` marker fails with `INVALID_RESPONSE`, so
+  deploy the compatible gateway before adopting this candidate.
 - **Native transport must be configured explicitly.** The native export no
   longer falls back to React Native's XHR-based Fetch. Callers must supply a
   `fetch` implementation that rejects redirects and omits ambient cookies; on
@@ -56,7 +58,7 @@ released, so every change below is relative to the published `0.1.0`.
 
 This package consumes the **customer** contract only. Its current 0.2.0
 snapshot is unreleased and records canonical contract commit
-`f7771f5ce1d48140ddbf38a113aeec60651b8d79`; release requires an immutable
+`325c9496ab40fbb7da60f2fc75d57c9d5e1c2b39`; release requires an immutable
 contract tag and commit as described in `RELEASING.md`. The
 newly required `Idempotency-Key` header on flow mutations, and the `200`
 returned alongside `201` for a replayed mutation, are **management** contract
