@@ -38,15 +38,10 @@ function command(exe, args, options = {}) {
     ...options,
   });
 }
-function simctl(...args) {
-  return command("xcrun", ["simctl", ...args]).trim();
-}
-const devices = JSON.parse(simctl("list", "devices", "available", "-j"));
-const selected = Object.values(devices.devices ?? {})
-  .flat()
-  .find((device) => device.udid === simulator);
-if (!selected || selected.name !== simulatorName || selected.state !== "Booted")
-  throw new Error("refusing non-booted owned simulator");
+// The workflow creates this per-attempt simulator and gates this step on a
+// successful `simctl bootstatus -b`. Re-enumerating every available device
+// here is both redundant and can hang CoreSimulator while its System App is
+// starting on a freshly booted GitHub-hosted runner.
 const work = mkdtempSync(path.join(tmpdir(), "daykeeper-hermes-ios-smoke-"));
 const app = path.join(work, "app");
 const derivedData = path.join(work, "derived-data");

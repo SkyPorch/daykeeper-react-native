@@ -23,6 +23,8 @@ test("requires explicit execution and disposable owned emulator", () => {
 test("requires an explicitly owned hosted macOS simulator", () => {
   const mac = {
     GITHUB_ACTIONS: "true",
+    GITHUB_RUN_ID: "123",
+    GITHUB_RUN_ATTEMPT: "1",
     RUNNER_OS: "macOS",
     RUNNER_ENVIRONMENT: "github-hosted",
     SIMULATOR_UDID: "01234567-89ab-cdef-0123-456789abcdef",
@@ -36,6 +38,8 @@ test("requires an explicitly owned hosted macOS simulator", () => {
     { ...mac, RUNNER_ENVIRONMENT: "self-hosted" },
     { ...mac, SIMULATOR_UDID: "booted" },
     { ...mac, RUNNER_OS: "Linux" },
+    { ...mac, SIMULATOR_NAME: "DaykeeperHermesSmoke-123-2" },
+    { ...mac, GITHUB_RUN_ID: "456" },
   ])
     assert.throws(() => validateIosHost(invalid, ["--execute", "pack.json"]));
 });
