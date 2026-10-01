@@ -119,9 +119,9 @@ export class DaykeeperReactNativeClient {
     }
     const cursor =
       options.after !== undefined
-        ? `?after=${positiveInteger(options.after, "after")}`
+        ? `?after=${positiveCursor(options.after, "after")}`
         : options.before !== undefined
-          ? `?before=${positiveInteger(options.before, "before")}`
+          ? `?before=${positiveCursor(options.before, "before")}`
           : "";
     return this.#request(`/v1/conversations/${id}/messages${cursor}`, {
       signal: options.signal,
@@ -371,6 +371,13 @@ function validateToken(value: string): string {
 }
 
 function positiveInteger(value: number, name: string): number {
+  if (!Number.isInteger(value) || value < 1) {
+    throw configurationError(`${name} must be a positive integer`);
+  }
+  return value;
+}
+
+function positiveCursor(value: number, name: string): number {
   if (!Number.isSafeInteger(value) || value < 1) {
     throw configurationError(`${name} must be a positive safe integer`);
   }

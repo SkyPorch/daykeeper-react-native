@@ -518,6 +518,28 @@ test("message cursors must be positive safe integers before dispatch", async () 
   assert.equal(urls.length, 1);
 });
 
+test("conversation IDs keep positive-integer validation while cursors stay safe", async () => {
+  const urls: string[] = [];
+  const client = createDaykeeperReactNativeClient({
+    baseUrl: "https://support.example.com",
+    getAccessToken: () => "synthetic-token",
+    fetch: async (input) => {
+      urls.push(String(input));
+      return Response.json({ messages: [] });
+    },
+  });
+
+  await client.listMessages(2 ** 53, { after: 1 });
+  assert.equal(
+    urls[0],
+    "https://support.example.com/v1/conversations/9007199254740992/messages?after=1",
+  );
+  assert.throws(() => client.listMessages(7, { before: 2 ** 53 }), {
+    code: "INVALID_CONFIGURATION",
+  });
+  assert.equal(urls.length, 1);
+});
+
 test("claims a widget thread without placing its token in the URL", async () => {
   let request: Request | undefined;
   const client = createDaykeeperReactNativeClient({
