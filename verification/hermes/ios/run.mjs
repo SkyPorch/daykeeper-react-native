@@ -50,8 +50,8 @@ if (!path.resolve(receiptPath).startsWith(`${runnerTemp}${path.sep}`))
   throw new Error(
     "simulator ownership receipt is outside the runner temp directory",
   );
-const receipt = JSON.parse(readFileSync(receiptPath, "utf8"));
-validateIosSimulatorReceipt(receipt, {
+const simulatorReceipt = JSON.parse(readFileSync(receiptPath, "utf8"));
+validateIosSimulatorReceipt(simulatorReceipt, {
   udid: simulator,
   name: simulatorName,
   runId: process.env.GITHUB_RUN_ID,
