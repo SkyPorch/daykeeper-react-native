@@ -2,22 +2,26 @@
 
 ## Version matrix
 
-| Package version     | Contract consumed                     | Contract version | Contract tag      | Contract commit                            |
-| ------------------- | ------------------------------------- | ---------------- | ----------------- | ------------------------------------------ |
-| `0.2.0`             | customer (`openapi/customer.yaml`)    | 0.1.0            | `v1.1.0`          | `c9a0175d0053f1a2d57c9329f6d3a36ec6acdb71` |
-| `0.1.0` (published) | customer (`openapi/customer.yaml`)    | 0.1.0            | `v1.0.0`          | `35f5bd45fe0c6a6901766543bff90dae6838b965` |
-| any                 | management (`openapi/daykeeper.yaml`) | 0.2.0            | not consumed here | not consumed here                          |
+| Package version      | Contract consumed                     | Contract version | Contract tag      | Contract commit                            |
+| -------------------- | ------------------------------------- | ---------------- | ----------------- | ------------------------------------------ |
+| `0.2.0` (unreleased) | customer (`openapi/customer.yaml`)    | 0.2.0            | none (unreleased) | `f7771f5ce1d48140ddbf38a113aeec60651b8d79` |
+| `0.1.0` (published)  | customer (`openapi/customer.yaml`)    | 0.1.0            | `v1.0.0`          | `35f5bd45fe0c6a6901766543bff90dae6838b965` |
+| any                  | management (`openapi/daykeeper.yaml`) | 0.2.0            | not consumed here | not consumed here                          |
 
-This package consumes only the **customer** contract. The customer contract
-snapshot is pinned to immutable repository tag `v1.1.0`; its OpenAPI `info.version`
-is `0.1.0`. It has no `Idempotency-Key`
+This package consumes only the **customer** contract. Its current snapshot comes
+from local canonical commit `f7771f5ce1d48140ddbf38a113aeec60651b8d79`; that
+commit is unreleased and has no tag. The OpenAPI `info.version` is `0.2.0`. It
+has no `Idempotency-Key`
 header. The now-required
 `Idempotency-Key` header on flow mutations, and the `200`-alongside-`201`
 replay response, are **management** contract 0.2.0 changes and do **not** apply
 to this package. The management contract is consumed by `daykeeper-node`,
 `daykeeper-mcp` and `daykeeper-cli`, not here. The 0.2.0 break in this package
-is its own: the native transport policy change and error-code passthrough
-described below.
+includes its own customer-contract pagination change: `listMessages()` without
+a cursor returns the latest 20 visible messages; callers that need older
+history must page with `before` until an empty result. A short page is not
+proof of exhaustion. It also includes the native transport policy change and
+error-code passthrough described below.
 
 Every release records the exact customer contract tag and commit used; see
 [`openapi/SOURCE.md`](openapi/SOURCE.md) and [`RELEASING.md`](RELEASING.md).

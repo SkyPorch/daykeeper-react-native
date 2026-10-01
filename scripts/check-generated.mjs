@@ -16,10 +16,10 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
-const EXPECTED_COMMIT = "c9a0175d0053f1a2d57c9329f6d3a36ec6acdb71";
+const EXPECTED_COMMIT = "f7771f5ce1d48140ddbf38a113aeec60651b8d79";
 const EXPECTED_SHA256 =
-  "322158cd5fa5c54a054d701ff64a9c8b07cad477414d7df83ba5a3aa7ee06cc3";
-const EXPECTED_BLOB = "bf566c97a541ac5e4e1f04670fb3b65475b635a6";
+  "1072bb8df15e4f96bb9463f8bb77d9b5a7b0b97d762ee25599bee6f81dd55b51";
+const EXPECTED_BLOB = "7285478b62e6ec33b2c35e7503508a73930433b8";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const contract = await readFile(join(root, "openapi/customer.yaml"));

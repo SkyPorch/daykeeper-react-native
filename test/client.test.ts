@@ -465,6 +465,59 @@ test("encodes polling cursors as positive integers", async () => {
   );
 });
 
+test("encodes older-message cursors and rejects conflicting cursors", async () => {
+  let requestedUrl = "";
+  const client = createDaykeeperReactNativeClient({
+    baseUrl: "https://support.example.com",
+    getAccessToken: () => "synthetic-token",
+    fetch: async (input) => {
+      requestedUrl = String(input);
+      return new Response(JSON.stringify({ messages: [] }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    },
+  });
+
+  await client.listMessages(7, { before: 12 });
+  assert.equal(
+    requestedUrl,
+    "https://support.example.com/v1/conversations/7/messages?before=12",
+  );
+  assert.throws(() => client.listMessages(7, { after: 2, before: 12 }), {
+    code: "INVALID_CONFIGURATION",
+  });
+});
+
+test("message cursors must be positive safe integers before dispatch", async () => {
+  let credentials = 0;
+  const urls: string[] = [];
+  const client = createDaykeeperReactNativeClient({
+    baseUrl: "https://support.example.com",
+    getAccessToken: () => {
+      credentials++;
+      return "synthetic-token";
+    },
+    fetch: async (input) => {
+      urls.push(String(input));
+      return Response.json({ messages: [] });
+    },
+  });
+
+  await client.listMessages(7, { before: Number.MAX_SAFE_INTEGER });
+  assert.equal(urls.length, 1);
+  assert.match(urls[0]!, /before=9007199254740991$/);
+  assert.throws(
+    () => client.listMessages(7, { before: Number.MAX_SAFE_INTEGER + 1 }),
+    { code: "INVALID_CONFIGURATION" },
+  );
+  assert.throws(() => client.listMessages(7, { after: 1e21 }), {
+    code: "INVALID_CONFIGURATION",
+  });
+  assert.equal(credentials, 1);
+  assert.equal(urls.length, 1);
+});
+
 test("claims a widget thread without placing its token in the URL", async () => {
   let request: Request | undefined;
   const client = createDaykeeperReactNativeClient({

@@ -1,13 +1,25 @@
 # Contract source
 
-`customer.yaml` is an exact copy of `openapi/customer.yaml` from
-`SkyPorch/daykeeper-openapi`, commit
-`c9a0175d0053f1a2d57c9329f6d3a36ec6acdb71`.
-The exact source bytes have SHA-256
-`322158cd5fa5c54a054d701ff64a9c8b07cad477414d7df83ba5a3aa7ee06cc3` and Git
-blob SHA-1 `bf566c97a541ac5e4e1f04670fb3b65475b635a6`.
+`customer.yaml` is an exact copy of `openapi/customer.yaml` from the local,
+unreleased canonical `SkyPorch/daykeeper-openapi` commit
+`f7771f5ce1d48140ddbf38a113aeec60651b8d79`. No release tag exists for this
+commit.
 
-- Tag status: v1.1.0 (immutable release tag).
+- SHA-256: `1072bb8df15e4f96bb9463f8bb77d9b5a7b0b97d762ee25599bee6f81dd55b51`
+- Git blob: `7285478b62e6ec33b2c35e7503508a73930433b8`
+- License: Apache-2.0; retained verbatim in this directory's `LICENSE`.
 
-Generation pull requests must copy an immutable tagged contract and record the
-tag and full commit SHA here.
+The contract adds mutually exclusive positive `before` and `after` message
+cursors. The initial read returns the latest 20 customer-visible messages in
+ascending order; `before` returns up to 20 older messages; `after` returns up to
+20 newer messages. Each response is capped at 768 KiB of UTF-8 JSON: initial and
+older pages keep the newest contiguous suffix that fits, while newer pages keep
+the oldest prefix. If one message alone exceeds the cap, the gateway returns
+`413 message_too_large`. Clients should continue loading older pages until an
+empty page, since a short page alone does not prove exhaustion after defensive
+filtering.
+
+This local snapshot is unreleased and is not a release provenance claim. Before
+publishing, replace the local commit reference with an approved immutable
+contract tag and its full commit SHA, then rerun the generated type and package
+checks. A hash match does not certify backend compatibility.

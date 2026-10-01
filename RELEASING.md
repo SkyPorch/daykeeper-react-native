@@ -30,8 +30,9 @@ Follow these steps in this order. Do not start a release out of order.
 2. **Point `openapi/SOURCE.md` at that tag.** Update the vendored snapshot
    record to the immutable tag _and_ its full commit SHA, and re-verify the
    contract checksum with `pnpm check:generated`. Never record a branch head or
-   an unmerged pull request head. The current snapshot records immutable `v1.1.0`; verify that tag still
-   resolves to the recorded commit before releasing.
+   an unmerged pull request head. The current snapshot records the unreleased local commit
+   `f7771f5ce1d48140ddbf38a113aeec60651b8d79` and has no tag; replace that provenance and verify
+   the release tag resolves to the recorded commit before releasing.
 3. **Finalize `CHANGELOG.md`.** The section for the version being released must
    carry no `(unreleased)` marker and must name every breaking change.
 4. **One reviewed version-bump commit,** covering `package.json`,

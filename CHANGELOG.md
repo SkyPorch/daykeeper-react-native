@@ -21,6 +21,12 @@ released, so every change below is relative to the published `0.1.0`.
 
 ### Breaking
 
+- **Message history is now explicitly paginated.** The customer 0.2.0 contract
+  returns only the latest 20 visible messages for an uncursored read. Callers
+  that need older messages must page with `before` and continue until an empty
+  response; a short non-empty response does not prove exhaustion. The new
+  `before` and existing `after` cursor are mutually exclusive positive safe
+  integers.
 - **Native transport must be configured explicitly.** The native export no
   longer falls back to React Native's XHR-based Fetch. Callers must supply a
   `fetch` implementation that rejects redirects and omits ambient cookies; on
@@ -48,7 +54,10 @@ released, so every change below is relative to the published `0.1.0`.
   has `outcomeUnknown: true`. Reconcile server state before a deliberate new
   write.
 
-This package consumes the **customer** contract only, which remains 0.1.0. The
+This package consumes the **customer** contract only. Its current 0.2.0
+snapshot is unreleased and records canonical contract commit
+`f7771f5ce1d48140ddbf38a113aeec60651b8d79`; release requires an immutable
+contract tag and commit as described in `RELEASING.md`. The
 newly required `Idempotency-Key` header on flow mutations, and the `200`
 returned alongside `201` for a replayed mutation, are **management** contract
 0.2.0 changes and do not apply here. The breaking changes above are this

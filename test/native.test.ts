@@ -51,9 +51,10 @@ test("every native operation dispatches with strict redirect and cookie policy",
   await client.getUnread();
   await client.markConversationSeen(1);
   await client.listMessages(1, { after: 2 });
+  await client.listMessages(1, { before: 1 });
   await client.sendMessage(1, "synthetic-message");
   await client.claimAnonymousConversation("synthetic-widget-token");
-  assert.equal(requests.length, 8);
+  assert.equal(requests.length, 9);
   for (const request of requests) {
     assert.equal(request.redirect, "error");
     assert.equal(request.credentials, "omit");
