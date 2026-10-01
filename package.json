@@ -46,7 +46,7 @@
     "verify:exports": "node scripts/verify-exports.mjs",
     "prepublishOnly": "node scripts/verify-release.mjs",
     "prepack": "pnpm run build",
-    "test:hermes-harness": "node --test verification/hermes/safety.test.mjs && tsx --test verification/hermes/android/fixture.test.ts"
+    "test:hermes-harness": "node --check verification/hermes/run.mjs && node --check verification/hermes/ios/run.mjs && node --test verification/hermes/safety.test.mjs && tsx --test verification/hermes/android/fixture.test.ts"
   },
   "packageManager": "pnpm@10.8.0",
   "engines": {
