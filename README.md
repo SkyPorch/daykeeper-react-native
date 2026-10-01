@@ -1,5 +1,7 @@
 # `@skyporch/daykeeper-react-native`
 
+For more about Daykeeper, visit [mydaykeeper.com](https://www.mydaykeeper.com).
+
 The official headless React Native client for customer-facing Daykeeper support
 experiences. Its types come from the Daykeeper customer API contract; its transport is
 designed for Expo and bare React Native applications on iOS and Android.
