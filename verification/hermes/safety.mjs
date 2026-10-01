@@ -33,7 +33,24 @@ export function validateIosHost(env, args) {
     throw new Error("explicit owned simulator UDID required");
   if (!/^DaykeeperHermesSmoke-\d+-\d+$/.test(env.SIMULATOR_NAME ?? ""))
     throw new Error("explicit owned simulator name required");
+  if (
+    !/^\d+$/.test(env.GITHUB_RUN_ID ?? "") ||
+    !/^\d+$/.test(env.GITHUB_RUN_ATTEMPT ?? "") ||
+    env.SIMULATOR_NAME !==
+      `DaykeeperHermesSmoke-${env.GITHUB_RUN_ID}-${env.GITHUB_RUN_ATTEMPT}`
+  )
+    throw new Error("simulator must belong to this GitHub Actions run attempt");
   return { udid: env.SIMULATOR_UDID, name: env.SIMULATOR_NAME };
+}
+
+export function validateIosSimulatorReceipt(receipt, expected) {
+  if (
+    receipt?.udid !== expected.udid ||
+    receipt?.name !== expected.name ||
+    receipt?.runId !== expected.runId ||
+    receipt?.runAttempt !== expected.runAttempt
+  )
+    throw new Error("simulator receipt does not match this run attempt");
 }
 
 export async function waitForMarker(

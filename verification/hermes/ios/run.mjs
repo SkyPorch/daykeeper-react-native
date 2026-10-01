@@ -10,7 +10,7 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { validateIosHost } from "../safety.mjs";
+import { validateIosHost, validateIosSimulatorReceipt } from "../safety.mjs";
 
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 const { udid: simulator, name: simulatorName } = validateIosHost(
@@ -38,15 +38,25 @@ function command(exe, args, options = {}) {
     ...options,
   });
 }
-function simctl(...args) {
-  return command("xcrun", ["simctl", ...args]).trim();
-}
-const devices = JSON.parse(simctl("list", "devices", "available", "-j"));
-const selected = Object.values(devices.devices ?? {})
-  .flat()
-  .find((device) => device.udid === simulator);
-if (!selected || selected.name !== simulatorName || selected.state !== "Booted")
-  throw new Error("refusing non-booted owned simulator");
+// The trusted workflow creates a run-scoped receipt from the exact UUID
+// returned by `simctl create`, then boots that UUID before invoking this file.
+// CoreSimulator inventory queries can hang while a new runner's System App
+// starts, so validate the workflow binding rather than re-enumerating devices.
+const receiptPath = process.env.SIMULATOR_RECEIPT;
+if (!receiptPath || !process.env.RUNNER_TEMP)
+  throw new Error("missing workflow simulator ownership receipt");
+const runnerTemp = path.resolve(process.env.RUNNER_TEMP);
+if (!path.resolve(receiptPath).startsWith(`${runnerTemp}${path.sep}`))
+  throw new Error(
+    "simulator ownership receipt is outside the runner temp directory",
+  );
+const simulatorReceipt = JSON.parse(readFileSync(receiptPath, "utf8"));
+validateIosSimulatorReceipt(simulatorReceipt, {
+  udid: simulator,
+  name: simulatorName,
+  runId: process.env.GITHUB_RUN_ID,
+  runAttempt: process.env.GITHUB_RUN_ATTEMPT,
+});
 const work = mkdtempSync(path.join(tmpdir(), "daykeeper-hermes-ios-smoke-"));
 const app = path.join(work, "app");
 const derivedData = path.join(work, "derived-data");

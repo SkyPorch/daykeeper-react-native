@@ -454,15 +454,104 @@ test("encodes polling cursors as positive integers", async () => {
     getAccessToken: () => "token",
     fetch: async (input) => {
       url = String(input);
-      return Response.json({ messages: [] });
+      return Response.json({ pagination: "cursor", messages: [] });
     },
   });
 
   await client.listMessages(7, { after: 11 });
   assert.equal(
     url,
-    "https://support.example.com/v1/conversations/7/messages?after=11",
+    "https://support.example.com/v1/conversations/7/messages?pagination=cursor&after=11",
   );
+});
+
+test("encodes older-message cursors and rejects conflicting cursors", async () => {
+  let requestedUrl = "";
+  const client = createDaykeeperReactNativeClient({
+    baseUrl: "https://support.example.com",
+    getAccessToken: () => "synthetic-token",
+    fetch: async (input) => {
+      requestedUrl = String(input);
+      return new Response(
+        JSON.stringify({ pagination: "cursor", messages: [] }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        },
+      );
+    },
+  });
+
+  await client.listMessages(7, { before: 12 });
+  assert.equal(
+    requestedUrl,
+    "https://support.example.com/v1/conversations/7/messages?pagination=cursor&before=12",
+  );
+  assert.throws(() => client.listMessages(7, { after: 2, before: 12 }), {
+    code: "INVALID_CONFIGURATION",
+  });
+});
+
+test("message cursors must be positive safe integers before dispatch", async () => {
+  let credentials = 0;
+  const urls: string[] = [];
+  const client = createDaykeeperReactNativeClient({
+    baseUrl: "https://support.example.com",
+    getAccessToken: () => {
+      credentials++;
+      return "synthetic-token";
+    },
+    fetch: async (input) => {
+      urls.push(String(input));
+      return Response.json({ pagination: "cursor", messages: [] });
+    },
+  });
+
+  await client.listMessages(7, { before: Number.MAX_SAFE_INTEGER });
+  assert.equal(urls.length, 1);
+  assert.match(urls[0]!, /pagination=cursor&before=9007199254740991$/);
+  assert.throws(
+    () => client.listMessages(7, { before: Number.MAX_SAFE_INTEGER + 1 }),
+    { code: "INVALID_CONFIGURATION" },
+  );
+  assert.throws(() => client.listMessages(7, { after: 1e21 }), {
+    code: "INVALID_CONFIGURATION",
+  });
+  assert.equal(credentials, 1);
+  assert.equal(urls.length, 1);
+});
+
+test("conversation IDs keep positive-integer validation while cursors stay safe", async () => {
+  const urls: string[] = [];
+  const client = createDaykeeperReactNativeClient({
+    baseUrl: "https://support.example.com",
+    getAccessToken: () => "synthetic-token",
+    fetch: async (input) => {
+      urls.push(String(input));
+      return Response.json({ pagination: "cursor", messages: [] });
+    },
+  });
+
+  await client.listMessages(2 ** 53, { after: 1 });
+  assert.equal(
+    urls[0],
+    "https://support.example.com/v1/conversations/9007199254740992/messages?pagination=cursor&after=1",
+  );
+  assert.throws(() => client.listMessages(7, { before: 2 ** 53 }), {
+    code: "INVALID_CONFIGURATION",
+  });
+  assert.equal(urls.length, 1);
+});
+
+test("cursor mode rejects a legacy response without its marker", async () => {
+  const client = createDaykeeperReactNativeClient({
+    baseUrl: "https://support.example.com",
+    getAccessToken: () => "synthetic-token",
+    fetch: async () => Response.json({ messages: [] }),
+  });
+  await assert.rejects(client.listMessages(7), {
+    code: "INVALID_RESPONSE",
+  });
 });
 
 test("claims a widget thread without placing its token in the URL", async () => {

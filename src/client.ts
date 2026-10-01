@@ -11,8 +11,8 @@ import type {
   DaykeeperClaimConversationResult,
   DaykeeperConversationList,
   DaykeeperConversationResult,
+  DaykeeperCursorMessageList,
   DaykeeperCustomerIdentity,
-  DaykeeperMessageList,
   DaykeeperMessageResult,
   DaykeeperSeenResult,
   DaykeeperUnreadSummary,
@@ -108,15 +108,41 @@ export class DaykeeperReactNativeClient {
 
   listMessages(
     conversationId: number,
-    options: DaykeeperReactNativeRequestOptions & { after?: number } = {},
-  ): Promise<DaykeeperMessageList> {
+    options: DaykeeperReactNativeRequestOptions & {
+      after?: number;
+      before?: number;
+    } = {},
+  ): Promise<DaykeeperCursorMessageList> {
     const id = positiveInteger(conversationId, "conversationId");
-    const after =
-      options.after === undefined
-        ? ""
-        : `?after=${positiveInteger(options.after, "after")}`;
-    return this.#request(`/v1/conversations/${id}/messages${after}`, {
-      signal: options.signal,
+    if (options.after !== undefined && options.before !== undefined) {
+      throw configurationError("after and before cannot be used together");
+    }
+    const cursor =
+      options.after !== undefined
+        ? `&after=${positiveCursor(options.after, "after")}`
+        : options.before !== undefined
+          ? `&before=${positiveCursor(options.before, "before")}`
+          : "";
+    return this.#request<unknown>(
+      `/v1/conversations/${id}/messages?pagination=cursor${cursor}`,
+      {
+        signal: options.signal,
+      },
+    ).then((page) => {
+      if (
+        !isRecord(page) ||
+        page.pagination !== "cursor" ||
+        !Array.isArray(page.messages) ||
+        !page.messages.every(
+          (message) =>
+            isRecord(message) &&
+            Number.isSafeInteger(message.id) &&
+            (message.id as number) > 0,
+        )
+      ) {
+        throw invalidResponse();
+      }
+      return page as DaykeeperCursorMessageList;
     });
   }
 
@@ -365,6 +391,13 @@ function validateToken(value: string): string {
 function positiveInteger(value: number, name: string): number {
   if (!Number.isInteger(value) || value < 1) {
     throw configurationError(`${name} must be a positive integer`);
+  }
+  return value;
+}
+
+function positiveCursor(value: number, name: string): number {
+  if (!Number.isSafeInteger(value) || value < 1) {
+    throw configurationError(`${name} must be a positive safe integer`);
   }
   return value;
 }

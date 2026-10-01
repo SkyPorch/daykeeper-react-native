@@ -87,6 +87,12 @@ or application logs.
 - `getUnread()` and `markConversationSeen()`
 - `claimAnonymousConversation()`
 
+`listMessages()` explicitly opts into the gateway's marked cursor profile for
+initial, newer, and older reads. A gateway that ignores `pagination=cursor` and
+returns the legacy envelope is rejected with `INVALID_RESPONSE`; deploy a
+compatible gateway before enabling this candidate. Use `before` to load older
+history until an empty page.
+
 See [`COMPATIBILITY.md`](COMPATIBILITY.md) for the supported runtime contract
 and release certification matrix.
 
