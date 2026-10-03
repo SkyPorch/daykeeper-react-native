@@ -151,6 +151,8 @@ command(
 command(
   "xcodebuild",
   [
+    "-jobs",
+    "2",
     "-workspace",
     "DaykeeperHermesSmoke.xcworkspace",
     "-scheme",
