@@ -22,9 +22,13 @@ export function validateIosHost(env, args) {
   if (
     env.GITHUB_ACTIONS !== "true" ||
     env.RUNNER_OS !== "macOS" ||
-    env.RUNNER_ENVIRONMENT !== "github-hosted"
+    !(
+      env.RUNNER_ENVIRONMENT === "github-hosted" ||
+      (env.RUNNER_ENVIRONMENT === "self-hosted" &&
+        env.RUNNER_NAME === "native-ios")
+    )
   )
-    throw new Error("disposable GitHub-hosted macOS runner required");
+    throw new Error("approved macOS runner required");
   if (
     !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
       env.SIMULATOR_UDID ?? "",

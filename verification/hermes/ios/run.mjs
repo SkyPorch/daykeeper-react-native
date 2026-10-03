@@ -195,7 +195,7 @@ const appExecutable = path.join(
   "Build/Products/Release-iphonesimulator/DaykeeperHermesSmoke.app/DaykeeperHermesSmoke",
 );
 const receipt = {
-  commit: process.env.GITHUB_SHA,
+  commit: command("git", ["rev-parse", "HEAD"], { cwd: root }).trim(),
   reactNative: "0.86.2",
   hermes: true,
   packageVersion: packed.version,
