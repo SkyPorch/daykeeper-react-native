@@ -1,6 +1,6 @@
 {
   "name": "@skyporch/daykeeper-react-native",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Official React Native SDK for Daykeeper customer support experiences",
   "type": "module",
   "sideEffects": false,

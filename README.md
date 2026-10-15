@@ -18,7 +18,7 @@ claim operations: those calls return `409` with `widget_unavailable` before the
 conversation provider is contacted. Use a widget-enabled gateway for those
 operations.
 
-This README describes the unreleased `0.2.0` candidate. Production certification
+This README describes `0.3.0`. Production certification
 is still open; a successful Metro build or Node test does not establish native
 parity. See [`COMPATIBILITY.md`](COMPATIBILITY.md) before a release or upgrade.
 
@@ -27,7 +27,7 @@ parity. See [`COMPATIBILITY.md`](COMPATIBILITY.md) before a release or upgrade.
 After the candidate is approved and published:
 
 ```sh
-npm install @skyporch/daykeeper-react-native@0.2.0
+npm install @skyporch/daykeeper-react-native@0.3.0
 ```
 
 Before publication, test with the reviewed packed tarball. An unversioned npm
@@ -171,6 +171,6 @@ The headless SDK does not own the app's login state or persistent storage.
 
 ## Release status
 
-Candidate `0.2.0` is generated from the customer contract recorded in
+`0.3.0` is generated from the customer contract recorded in
 [`openapi/SOURCE.md`](openapi/SOURCE.md). Releases use the protected,
 provenance-producing process in [`RELEASING.md`](RELEASING.md).
