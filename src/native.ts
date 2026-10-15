@@ -23,8 +23,9 @@ export interface DaykeeperReactNativeClientOptions extends BaseOptions {
   /**
    * Describe this device to the gateway (app name and version, OS, device
    * model, language, time zone) so agents see it on the contact. On by
-   * default; nothing identifies the device or the person. Values the host
-   * backend signs into the customer session take precedence.
+   * default on iOS and Android. No device or advertising identifier and no
+   * precise location is sent. Values the host backend signs into the
+   * customer session take precedence.
    */
   sendDeviceContext?: boolean;
 }
@@ -44,40 +45,41 @@ export class DaykeeperReactNativeClient extends BaseClient {
     const transport = options.fetch;
     // Read once: none of it changes while the app runs. `react-native` is
     // imported lazily so this entry still loads where it is absent (Node
-    // tooling, tests); there, as on any failure, no context is sent and the
-    // request goes ahead regardless.
-    const deviceContext =
-      options.sendDeviceContext === false
-        ? Promise.resolve(undefined)
-        : import("react-native")
-            .then((module) => {
-              const reactNative = (
-                module.Platform
-                  ? module
-                  : (module as { default?: unknown }).default
-              ) as typeof module;
-              return encodeDeviceContext(
-                collectDeviceContext(
-                  {
-                    Platform: reactNative.Platform,
-                    NativeModules: reactNative.NativeModules,
-                    TurboModuleRegistry: reactNative.TurboModuleRegistry,
-                  },
-                  { name: "react-native", version: SDK_VERSION },
-                ),
-              );
-            })
-            .catch(() => undefined);
+    // tooling, tests). A request never waits for it: until the report is
+    // ready, or if it never is, requests go out without it.
+    let deviceContext: string | undefined;
+    if (options.sendDeviceContext !== false) {
+      import("react-native")
+        .then((module) => {
+          const reactNative = (
+            module.Platform ? module : (module as { default?: unknown }).default
+          ) as typeof module;
+          const os = reactNative.Platform?.OS;
+          // Expo web resolves this entry too; a browser's description is the
+          // web SDK's job, and an extra header would change its preflight.
+          if (os !== "ios" && os !== "android") return;
+          deviceContext = encodeDeviceContext(
+            collectDeviceContext(
+              {
+                Platform: reactNative.Platform,
+                NativeModules: reactNative.NativeModules,
+                TurboModuleRegistry: reactNative.TurboModuleRegistry,
+              },
+              { name: "react-native", version: SDK_VERSION },
+            ),
+          );
+        })
+        .catch(() => undefined);
+    }
     super({
       ...options,
-      fetch: async (input, init) => {
+      fetch: (input, init) => {
         // Expo 57 does not forward Fetch's cache option to URLSession/OkHttp.
         // no-cache revalidates an existing entry; no-store prevents new storage.
         // Keep this native-only so browser preflights gain no custom headers.
         const headers = new Headers(init?.headers);
         headers.set("cache-control", "no-cache, no-store");
-        const context = await deviceContext;
-        if (context) headers.set(DAYKEEPER_CLIENT_HEADER, context);
+        if (deviceContext) headers.set(DAYKEEPER_CLIENT_HEADER, deviceContext);
         return transport(input, { ...init, headers });
       },
     });

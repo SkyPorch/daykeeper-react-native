@@ -45,11 +45,17 @@ type Bag = Record<string, unknown>;
 const record = (value: unknown): Bag | undefined =>
   value && typeof value === "object" ? (value as Bag) : undefined;
 
+// Control characters and bidi overrides have no place in a device name and
+// would only make what an agent reads misleading.
+const UNPRINTABLE = /[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/;
+
 const text = (value: unknown): string | undefined => {
   if (typeof value === "number" && Number.isFinite(value)) return String(value);
   if (typeof value !== "string") return undefined;
   const trimmed = value.trim();
-  return trimmed && trimmed.length <= 100 ? trimmed : undefined;
+  return trimmed && trimmed.length <= 100 && !UNPRINTABLE.test(trimmed)
+    ? trimmed
+    : undefined;
 };
 
 const first = (...values: unknown[]): string | undefined => {
@@ -99,6 +105,20 @@ const intlContext = (): Pick<DaykeeperDeviceContext, "locale" | "timeZone"> => {
   }
 };
 
+/** A read that may throw (JSI getters can) answers nothing instead. */
+const safely = <T>(read: () => T): T | undefined => {
+  try {
+    return read();
+  } catch {
+    return undefined;
+  }
+};
+
+type ReportedField = Exclude<
+  keyof DaykeeperDeviceContext,
+  "sdk" | "sdkVersion" | "locale" | "timeZone"
+>;
+
 export function collectDeviceContext(
   sources: ReactNativeDeviceSources,
   sdk: { name: string; version: string },
@@ -107,55 +127,65 @@ export function collectDeviceContext(
     sdk: sdk.name,
     sdkVersion: sdk.version,
   };
-  try {
-    const os = sources.Platform?.OS;
-    const constants = record(sources.Platform?.constants) ?? {};
-    const application = expoModule("ExpoApplication") ?? {};
-    const device = expoModule("ExpoDevice") ?? {};
-    const deviceInfo = deviceInfoConstants(sources);
-
-    const values: Omit<DaykeeperDeviceContext, "sdk" | "sdkVersion"> = {
-      platform:
-        os === "ios" || os === "android" || os === "web" ? os : undefined,
-      osName: first(
-        device.osName,
-        os === "ios" ? constants.systemName : undefined,
+  // Each source and each field is read on its own, so one that throws costs
+  // only what it would have answered.
+  const os = safely(() => sources.Platform?.OS);
+  const constants = safely(() => record(sources.Platform?.constants)) ?? {};
+  const application = safely(() => expoModule("ExpoApplication")) ?? {};
+  const device = safely(() => expoModule("ExpoDevice")) ?? {};
+  const deviceInfo = safely(() => deviceInfoConstants(sources)) ?? {};
+  const read = (bag: Bag, key: string) => safely(() => bag[key]);
+  const fields: Record<ReportedField, () => unknown> = {
+    platform: () =>
+      os === "ios" || os === "android" || os === "web" ? os : undefined,
+    osName: () =>
+      first(
+        read(device, "osName"),
+        os === "ios" ? read(constants, "systemName") : undefined,
         os === "android" ? "Android" : undefined,
-        deviceInfo.systemName,
+        read(deviceInfo, "systemName"),
       ),
-      osVersion: first(
-        device.osVersion,
-        os === "ios" ? constants.osVersion : undefined,
-        os === "android" ? constants.Release : undefined,
-        deviceInfo.systemVersion,
-        os === "ios" ? sources.Platform.Version : undefined,
+    osVersion: () =>
+      first(
+        read(device, "osVersion"),
+        os === "ios" ? read(constants, "osVersion") : undefined,
+        os === "android" ? read(constants, "Release") : undefined,
+        read(deviceInfo, "systemVersion"),
+        os === "ios" ? safely(() => sources.Platform.Version) : undefined,
       ),
-      deviceBrand: first(
-        device.brand,
-        os === "android" ? constants.Brand : undefined,
+    deviceBrand: () =>
+      first(
+        read(device, "brand"),
+        os === "android" ? read(constants, "Brand") : undefined,
         os === "ios" ? "Apple" : undefined,
-        deviceInfo.brand,
+        read(deviceInfo, "brand"),
       ),
-      deviceModel: first(
-        device.modelName,
-        os === "android" ? constants.Model : undefined,
-        deviceInfo.model,
+    deviceModel: () =>
+      first(
+        read(device, "modelName"),
+        os === "android" ? read(constants, "Model") : undefined,
+        read(deviceInfo, "model"),
       ),
-      appName: first(application.applicationName, deviceInfo.appName),
-      appId: first(application.applicationId, deviceInfo.bundleId),
-      appVersion: first(
-        application.nativeApplicationVersion,
-        deviceInfo.appVersion,
+    appName: () =>
+      first(read(application, "applicationName"), read(deviceInfo, "appName")),
+    appId: () =>
+      first(read(application, "applicationId"), read(deviceInfo, "bundleId")),
+    appVersion: () =>
+      first(
+        read(application, "nativeApplicationVersion"),
+        read(deviceInfo, "appVersion"),
       ),
-      appBuild: first(application.nativeBuildVersion, deviceInfo.buildNumber),
-      ...intlContext(),
-    };
-    for (const [key, value] of Object.entries(values))
-      if (value !== undefined) (context as unknown as Bag)[key] = value;
-  } catch {
-    // Whatever was gathered before the failure is still worth sending.
+    appBuild: () =>
+      first(
+        read(application, "nativeBuildVersion"),
+        read(deviceInfo, "buildNumber"),
+      ),
+  };
+  for (const [key, answer] of Object.entries(fields)) {
+    const value = safely(answer);
+    if (value !== undefined) (context as unknown as Bag)[key] = value;
   }
-  return context;
+  return Object.assign(context, intlContext());
 }
 
 const utf8 = (value: string): Uint8Array => {
