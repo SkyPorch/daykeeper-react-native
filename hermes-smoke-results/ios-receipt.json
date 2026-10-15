@@ -1,0 +1,14 @@
+{
+  "commit": "496bffec78eca8c3bb7d69dd49a9b22b63da496f",
+  "reactNative": "0.86.2",
+  "hermes": true,
+  "packageVersion": "0.2.0",
+  "integrity": "sha512-zNliiPkoHVen77dbxqMvGPJ6PCnilw9Y2eFFS3Xf4FHZPMB1Pq3/BXP7t+mLqdqCVTBcungbl6SulBg1OMfAuA==",
+  "applicationId": "com.daykeeperhermessmoke",
+  "simulator": "14657665-662E-4E94-82B5-E69CFD91732A",
+  "simulatorName": "DaykeeperHermesSmoke-3-1",
+  "marker": "DAYKEEPER_HERMES_SMOKE_OK_2649d324-0bfa-4032-83ee-120a30a73019",
+  "packageSha256": "eefc0da0713891a218676bf33a8242e4752b4f9278e82ed538567ec44a83af4c",
+  "appExecutableSha256": "cdaba1a2cf41ba1cba1996ced26c5886f3958efba6cd5d07a4f68601364428bf",
+  "scope": "Packed SDK iOS/Hermes runtime with synthetic Fetch responses; no live gateway or device parity claim"
+}

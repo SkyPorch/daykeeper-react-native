@@ -44,29 +44,24 @@ export class DaykeeperReactNativeClient extends BaseClient {
     }
     const transport = options.fetch;
     // Read once: none of it changes while the app runs. `react-native` is
-    // imported lazily so this entry still loads where it is absent (Node
-    // tooling, tests). A request never waits for it: until the report is
-    // ready, or if it never is, requests go out without it.
+    // reached lazily through reactNativeSources so this entry still loads
+    // where it is absent (Node tooling, tests). A request never waits for
+    // it: until the report is ready, or if it never is, requests go out
+    // without it.
     let deviceContext: string | undefined;
     if (options.sendDeviceContext !== false) {
-      import("react-native")
-        .then((module) => {
-          const reactNative = (
-            module.Platform ? module : (module as { default?: unknown }).default
-          ) as typeof module;
-          const os = reactNative.Platform?.OS;
+      import("./reactNativeSources.js")
+        .then(({ reactNativeSources }) => {
+          const sources = reactNativeSources();
+          const os = sources.Platform?.OS;
           // Expo web resolves this entry too; a browser's description is the
           // web SDK's job, and an extra header would change its preflight.
           if (os !== "ios" && os !== "android") return;
           deviceContext = encodeDeviceContext(
-            collectDeviceContext(
-              {
-                Platform: reactNative.Platform,
-                NativeModules: reactNative.NativeModules,
-                TurboModuleRegistry: reactNative.TurboModuleRegistry,
-              },
-              { name: "react-native", version: SDK_VERSION },
-            ),
+            collectDeviceContext(sources, {
+              name: "react-native",
+              version: SDK_VERSION,
+            }),
           );
         })
         .catch(() => undefined);
