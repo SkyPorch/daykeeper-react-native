@@ -32,8 +32,8 @@ test("an Expo iOS app describes itself completely", async () => {
   const context = await withExpoModules(
     {
       ExpoApplication: {
-        applicationName: "Attached",
-        applicationId: "com.skyporch.attached",
+        applicationName: "Example App",
+        applicationId: "com.example.app",
         nativeApplicationVersion: "20261009.0",
         nativeBuildVersion: "174",
       },
@@ -66,8 +66,8 @@ test("an Expo iOS app describes itself completely", async () => {
       osVersion: "26.6.1",
       deviceBrand: "Apple",
       deviceModel: "iPhone 16 Pro",
-      appName: "Attached",
-      appId: "com.skyporch.attached",
+      appName: "Example App",
+      appId: "com.example.app",
       appVersion: "20261009.0",
       appBuild: "174",
       locale: undefined,

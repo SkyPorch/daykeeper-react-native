@@ -9,8 +9,8 @@
   build, language, time zone, and the SDK version. Agents see it on the
   contact without any host code. App details and the iOS model are read from
   `expo-application`/`expo-device` or `react-native-device-info` when present.
-  Opt out with `sendDeviceContext: false`. Requires a gateway that accepts the
-  header (SkyPorch/daykeeper `claude/sdk-client-context`).
+  Opt out with `sendDeviceContext: false`. The values reach the contact only
+  through a Daykeeper gateway that accepts the `Daykeeper-Client` header.
 
 ## 0.2.0 — 2026-09-21
 
