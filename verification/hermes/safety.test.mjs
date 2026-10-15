@@ -20,7 +20,7 @@ test("requires explicit execution and disposable owned emulator", () => {
   }
   assert.throws(() => validateHost(env, ["pack.json"]));
 });
-test("requires an explicitly owned hosted macOS simulator", () => {
+test("requires an explicitly owned simulator on approved macOS capacity", () => {
   const mac = {
     GITHUB_ACTIONS: "true",
     RUNNER_OS: "macOS",
@@ -32,8 +32,19 @@ test("requires an explicitly owned hosted macOS simulator", () => {
     udid: mac.SIMULATOR_UDID,
     name: mac.SIMULATOR_NAME,
   });
+  assert.deepEqual(
+    validateIosHost(
+      { ...mac, RUNNER_ENVIRONMENT: "self-hosted", RUNNER_NAME: "native-ios" },
+      ["--execute", "pack.json"],
+    ),
+    {
+      udid: mac.SIMULATOR_UDID,
+      name: mac.SIMULATOR_NAME,
+    },
+  );
   for (const invalid of [
     { ...mac, RUNNER_ENVIRONMENT: "self-hosted" },
+    { ...mac, RUNNER_ENVIRONMENT: "self-hosted", RUNNER_NAME: "unapproved" },
     { ...mac, SIMULATOR_UDID: "booted" },
     { ...mac, RUNNER_OS: "Linux" },
   ])
