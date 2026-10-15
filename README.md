@@ -79,6 +79,24 @@ the read once. Writes never refresh and replay automatically. Keep customer toke
 in memory where possible. Never place them in URLs, analytics, crash reports,
 or application logs.
 
+## Device context
+
+On iOS and Android, every request tells Daykeeper about the device it runs on,
+so agents see it on the contact with no code in your app: platform, OS name and
+version, device brand and model, app name, identifier, version and build,
+device language, time zone, and this SDK's name and version.
+
+`Platform` answers OS, version and, on Android, brand and model. App details
+and the iOS device model come from `expo-application`/`expo-device` or
+`react-native-device-info` when your app already includes them; the SDK adds
+no native dependency. No device or advertising identifier and no precise
+location is sent; the time zone is. Values your backend signs into the
+customer session take precedence.
+
+The report is read once per client and never delays a request: one sent before
+it is ready goes without it. Expo web sends none (the web SDK describes
+browsers). To send none of it, pass `sendDeviceContext: false`.
+
 ## API
 
 - `getIdentity()`
