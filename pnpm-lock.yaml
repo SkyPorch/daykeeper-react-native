@@ -31,8 +31,8 @@ importers:
         specifier: 7.13.0
         version: 7.13.0(typescript@5.9.3)
       prettier:
-        specifier: 3.9.6
-        version: 3.9.6
+        specifier: 3.9.10
+        version: 3.9.10
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -1922,8 +1922,8 @@ packages:
       yaml:
         optional: true
 
-  prettier@3.9.6:
-    resolution: {integrity: sha512-OpN0zzVdiaiAhxpuuj5efpIS4sY9j7bY6uR5mnj5yPzGkdkjNKSJeUThPb60Jw29QuAZgA4o+/iB49kFiaBX6g==}
+  prettier@3.9.10:
+    resolution: {integrity: sha512-skGHTH1Yb9QvaTC4hWnRTzEYtCpApF0UMBPz+t/0ZPzP8ihefo/btKd+QA7pUE0fEwA1SbS/NmhyEcstdXOIdA==}
     engines: {node: '>=14'}
     hasBin: true
 
@@ -4492,7 +4492,7 @@ snapshots:
       tsx: 4.23.15
       yaml: 2.9.0
 
-  prettier@3.9.6: {}
+  prettier@3.9.10: {}
 
   pretty-format@29.7.0:
     dependencies:
