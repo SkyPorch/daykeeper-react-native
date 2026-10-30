@@ -11,6 +11,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { validateIosHost } from "../safety.mjs";
+import { sceneLifecycle } from "./scene-lifecycle.mjs";
 
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 const { udid: simulator, name: simulatorName } = validateIosHost(
@@ -70,6 +71,22 @@ command(
     app,
   ],
   { stdio: "inherit", timeout: 180_000 },
+);
+const appDelegatePath = path.join(
+  app,
+  "ios/DaykeeperHermesSmoke/AppDelegate.swift",
+);
+const infoPlistPath = path.join(app, "ios/DaykeeperHermesSmoke/Info.plist");
+const lifecycle = sceneLifecycle(
+  readFileSync(appDelegatePath, "utf8"),
+  JSON.parse(command("plutil", ["-convert", "json", "-o", "-", infoPlistPath])),
+);
+writeFileSync(appDelegatePath, lifecycle.appDelegate);
+writeFileSync(
+  infoPlistPath,
+  command("plutil", ["-convert", "xml1", "-o", "-", "-"], {
+    input: JSON.stringify(lifecycle.infoPlist),
+  }),
 );
 copyFileSync(
   path.join(root, "verification/hermes/android/fixture.ts"),
