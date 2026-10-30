@@ -50,3 +50,13 @@ test("unrecognized or already-migrated templates fail before being overwritten",
     /Unexpected/,
   );
 });
+
+test("pinned template permits a blank line before factory startup", () => {
+  const source = template.replace(
+    "\n    factory.startReactNative(",
+    "\n\n    factory.startReactNative(",
+  );
+  const result = sceneLifecycle(source, {});
+  assert.equal(result.appDelegate.split("factory.startReactNative(").length, 2);
+  assert.ok(!result.appDelegate.includes("UIWindow(frame:"));
+});

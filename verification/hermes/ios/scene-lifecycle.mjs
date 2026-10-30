@@ -1,14 +1,10 @@
-const legacyStartup = `    window = UIWindow(frame: UIScreen.main.bounds)
-    factory.startReactNative(
-      withModuleName: "DaykeeperHermesSmoke",
-      in: window,
-      launchOptions: launchOptions
-    )`;
+const legacyStartup =
+  /    window = UIWindow\(frame: UIScreen\.main\.bounds\)\n\s*factory\.startReactNative\(\n      withModuleName: "DaykeeperHermesSmoke",\n      in: window,\n      launchOptions: launchOptions\n    \)/g;
 
 // Adapt only this synthetic, launch-only fixture. Keep the pinned SDK/RN versions.
 export function sceneLifecycle(appDelegate, infoPlist) {
   if (
-    appDelegate.split(legacyStartup).length !== 2 ||
+    (appDelegate.match(legacyStartup) ?? []).length !== 1 ||
     !appDelegate.includes("var reactNativeFactory: RCTReactNativeFactory?") ||
     infoPlist.UIApplicationSceneManifest !== undefined
   )
