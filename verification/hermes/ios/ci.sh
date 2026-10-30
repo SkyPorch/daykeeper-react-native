@@ -15,8 +15,8 @@ pnpm test:hermes-harness
 pnpm build
 mkdir -p "$RUNNER_TEMP/daykeeper-packed"
 npm pack --ignore-scripts --json --pack-destination "$RUNNER_TEMP/daykeeper-packed" > "$RUNNER_TEMP/daykeeper-packed/pack.json"
-runtime=$(xcrun simctl list runtimes -j | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const r=JSON.parse(s).runtimes.filter(x=>x.isAvailable&&x.identifier.startsWith("com.apple.CoreSimulator.SimRuntime.iOS-")); if(!r.length) process.exit(1); r.sort((a,b)=>a.version.localeCompare(b.version,undefined,{numeric:true})); process.stdout.write(r.at(-1).identifier)})')
-device_type=$(xcrun simctl list devicetypes -j | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const d=JSON.parse(s).devicetypes.find(x=>x.name==="iPhone 16")||JSON.parse(s).devicetypes.find(x=>x.name.startsWith("iPhone ")); if(!d) process.exit(1); process.stdout.write(d.identifier)})')
+selection=$(xcrun simctl list runtimes -j | node verification/hermes/ios/select-simulator.mjs)
+IFS=$'\t' read -r runtime device_type <<< "$selection"
 name="DaykeeperHermesSmoke-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
 simulator=$(xcrun simctl create "$name" "$device_type" "$runtime")
 xcrun simctl boot "$simulator"
